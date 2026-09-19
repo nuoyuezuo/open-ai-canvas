@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
 
-import { appearanceLogoURL, normalizePublicAppearance } from "../src/stores/use-appearance-store";
+import { appearanceLogoURL, DEFAULT_PUBLIC_APPEARANCE, normalizePublicAppearance } from "../src/stores/use-appearance-store";
 
 test("initial HTML stays brand neutral until the public appearance is resolved", async () => {
     const [html, mainSource] = await Promise.all([Bun.file(new URL("../index.html", import.meta.url)).text(), Bun.file(new URL("../src/main.tsx", import.meta.url)).text()]);
 
-    expect(html).not.toContain("影策");
+    expect(html).not.toContain("才遇");
     expect(html).not.toContain("/logo.svg");
     expect(html).toContain("<title>正在加载</title>");
     expect(mainSource.indexOf("bootstrapAppearance()")).toBeLessThan(mainSource.indexOf('import("./application")'));
@@ -66,6 +66,17 @@ test("appearance selects theme logos and falls back to the single configured log
     expect(single.logoFrameEnabled).toBe(true);
 });
 
+test("built-in appearance ships separate light and dark logos with a theme-independent favicon", async () => {
+    const store = await Bun.file(new URL("../src/stores/use-appearance-store.ts", import.meta.url)).text();
+
+    expect(DEFAULT_PUBLIC_APPEARANCE.logoUrl).toBe("/logo.svg");
+    expect(DEFAULT_PUBLIC_APPEARANCE.darkLogoUrl).toBe("/logo-dark.svg");
+    expect(appearanceLogoURL(DEFAULT_PUBLIC_APPEARANCE, "light")).toBe("/logo.svg");
+    expect(appearanceLogoURL(DEFAULT_PUBLIC_APPEARANCE, "dark")).toBe("/logo-dark.svg");
+    expect(store).toContain('appearanceLogoURL(appearance, "light")');
+    expect(store).toContain('favicon.href = appearanceLogoURL(appearance, "light")');
+});
+
 test("auth scene consumes resolved appearance instead of hardcoded media constants", async () => {
     const source = await Bun.file(new URL("../src/pages/auth/auth-scene.tsx", import.meta.url)).text();
 
@@ -119,10 +130,10 @@ test("object storage can adopt the configured English brand identifier without r
     expect(source).toContain("setting.pathPrefix || DEFAULT_OSS_PATH_PREFIX");
 });
 
-test("appearance management exposes a server-side reset to the built-in Yingce brand", async () => {
+test("appearance management exposes a server-side reset to the built-in Caiyu brand", async () => {
     const [pageSource, apiSource] = await Promise.all([Bun.file(new URL("../src/pages/admin/settings/appearance-settings-page.tsx", import.meta.url)).text(), Bun.file(new URL("../src/services/api/appearance.ts", import.meta.url)).text()]);
 
-    expect(pageSource).toContain("恢复影策默认");
+    expect(pageSource).toContain("恢复才遇默认");
     expect(pageSource).toContain("resetAdminAppearance()");
     expect(pageSource).toContain("已上传文件仍保留在存储资源中");
     expect(apiSource).toContain('http.delete<{ setting: AdminAppearance }>("/admin/settings/appearance")');

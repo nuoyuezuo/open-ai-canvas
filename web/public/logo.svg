@@ -1,3 +1,8 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M6 8H36V16H14V36H28V44H6V8ZM58 20H36V28H50V48H28V56H58V20ZM24 27H40V37H24V27Z" fill="currentColor"/>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="才遇">
+    <rect x="4" y="6" width="10" height="52" fill="#0B0B0F"/>
+    <rect x="4" y="6" width="26" height="10" fill="#0B0B0F"/>
+    <rect x="4" y="48" width="26" height="10" fill="#0B0B0F"/>
+    <path d="M34 6h10l8 24H42L34 6Z" fill="#0B0B0F"/>
+    <path d="M60 6H50l-8 24h10L60 6Z" fill="#0B0B0F"/>
+    <rect x="42" y="30" width="10" height="28" fill="#0B0B0F"/>
 </svg>

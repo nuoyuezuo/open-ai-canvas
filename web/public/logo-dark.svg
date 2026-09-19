@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="才遇">
+    <rect x="4" y="6" width="10" height="52" fill="#FFFFFF"/>
+    <rect x="4" y="6" width="26" height="10" fill="#FFFFFF"/>
+    <rect x="4" y="48" width="26" height="10" fill="#FFFFFF"/>
+    <path d="M34 6h10l8 24H42L34 6Z" fill="#FFFFFF"/>
+    <path d="M60 6H50l-8 24h10L60 6Z" fill="#FFFFFF"/>
+    <rect x="42" y="30" width="10" height="28" fill="#FFFFFF"/>
+</svg>

@@ -7,6 +7,6 @@ export function shouldShowSidebarCheckin(input: {
 }
 
 export function sidebarCheckinTitle(brandName: string) {
-    const name = brandName.trim() || "影策";
+    const name = brandName.trim() || "才遇";
     return `${name}加油站`;
 }
