@@ -27,6 +27,8 @@ export type RuntimeLimits = {
 export type FeatureAvailability = {
     welcomeEnabled: boolean;
     shortDramaEnabled: boolean;
+    comicEnabled: boolean;
+    comicDramaEnabled: boolean;
     taskCenterEnabled: boolean;
     creditsEnabled: boolean;
     customChannelsEnabled: boolean;
@@ -41,6 +43,8 @@ export type FeatureAvailability = {
 export const defaultFeatureAvailability: FeatureAvailability = {
     welcomeEnabled: true,
     shortDramaEnabled: true,
+    comicEnabled: true,
+    comicDramaEnabled: true,
     taskCenterEnabled: true,
     creditsEnabled: true,
     customChannelsEnabled: true,

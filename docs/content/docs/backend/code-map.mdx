@@ -20,6 +20,8 @@ description: 从产品功能快速定位主要代码入口
 | 任务中心 | `web/src/pages/tasks/` | `services/api/task-center.ts`、`services/api/task-text-stream.ts` |
 | 我的素材 | `web/src/pages/assets/` | `stores/use-asset-store.ts`、`services/image-storage.ts` |
 | 技能库 | `web/src/pages/skills/` | `services/api/skills.ts`、`services/skill-runtime.ts`、`components/skills/skill-runtime-picker.tsx` |
+| 漫画创作 | `web/src/pages/comic/` | `lib/comic/`、`lib/project-workflow-profile.ts`、`services/api/novels.ts`、后端 `internal/novel/` |
+| 漫剧创作（骨架） | `web/src/pages/comic-drama/` | 复用漫画 profile，动态演出与配音待开发 |
 | 画布列表 | `web/src/pages/canvas/index.tsx` | `stores/canvas/use-canvas-store.ts` |
 | 画布编辑器 | `web/src/pages/canvas/project.tsx` | `pages/canvas/canvas-project-*`、`pages/canvas/use-canvas-*`、`components/canvas/`、`lib/canvas/`、`stores/canvas/` |
 | 公开分享 | `web/src/pages/canvas/shared.tsx` | `components/canvas/infinite-canvas.tsx`、`services/api/canvas-share.ts` |
@@ -90,6 +92,7 @@ HTTP 请求 -> handler -> service（稳定导入面 / 别名）-> app（组合�
 | `auth` | 登录注册、OAuth、邮件验证码、LibTV/TapNow 导入 | **已抽出**：`internal/auth` |
 | `canvas` | 画布公开分享、媒体引用守卫、用户画布/素材库同步 | **已抽出**：`internal/canvas` |
 | `assets` | 资源 URL/引用解析、流式交付类型 | **部分抽出**：`internal/assets`；OSS/配额/转码仍在 `app` |
+| `novel` | 小说检索、版权状态归一与防侵权改编前置校验 | **已抽出**：`internal/novel`；外部资料库配置在 `app/settings_novel_library.go` |
 
 组合根原则：`service.New`（委托 `app.New`）组装各域服务；coordinator 不得再持有整个 `*Service` 回灌域包。
 
@@ -109,6 +112,8 @@ HTTP 请求 -> handler -> service（稳定导入面 / 别名）-> app（组合�
 | 提示词模板 | `handler/auth.go`、`handler/user_data.go` | `internal/prompts` |
 | 用户风格库 | `handler/style_profile.go` | `internal/prompts`、`repository/style_profile.go` |
 | 用量分析 | `handler/admin_analytics.go` | `internal/app/analytics.go`、`repository/analytics.go` |
+| 漫画小说检索与资料库 | `handler/novel.go` | `internal/novel`、`app/novel_bridge.go`、`app/settings_novel_library.go` |
+| 项目生产工作流（短剧 / 漫画） | `handler/project.go` | `app/project.go`、`app/project_workflow.go`；模板按项目类型选择 |
 
 登录恢复仅初始化当前账号缓存与增量同步会话，不再自动读取 `GET /api/user-data/snapshot`。画布库通过分页摘要加载，打开、导出、重命名时按 ID 读取完整画布，引用素材通过批量 ID 接口读取；旧快照接口仍保留供显式调用。实现见 `internal/canvas/user_data_page.go` 和前端 `services/user-data-sync.ts`。用户库素材写入（`UpsertUserAsset` / `ReplaceUserAssets`）在 `internal/canvas/user_asset_document.go` 校验 SPA 合同：`kind`、`coverUrl`、`tags` 字符串数组，以及按类型完整的 `data`。不完整 payload 在入库时拒绝；GET 仍返回已保存的原始 JSON。上游异构 JSON 的可选字符串仍走 `stringField`；任务 ID 等关键字段走 `firstJSONString`，数字 ID 不再被当成“缺字段”。
 

@@ -23,6 +23,8 @@ type (
 
 const (
 	FeatureShortDrama            = platform.FeatureShortDrama
+	FeatureComic                 = platform.FeatureComic
+	FeatureComicDrama            = platform.FeatureComicDrama
 	FeatureTaskCenter            = platform.FeatureTaskCenter
 	FeatureCredits               = platform.FeatureCredits
 	FeatureCustomChannels        = platform.FeatureCustomChannels

@@ -24,6 +24,7 @@ const (
 
 var skillCategoryLabels = map[string]string{
 	"drama":     "短剧影视",
+	"comic":     "漫画漫剧",
 	"ecommerce": "电商营销",
 	"creative":  "创意设计",
 	"social":    "社媒内容",
@@ -465,6 +466,7 @@ func validSkillURL(value string) bool {
 func skillCategories() []SkillCategory {
 	return []SkillCategory{
 		{Value: "drama", Label: skillCategoryLabels["drama"]},
+		{Value: "comic", Label: skillCategoryLabels["comic"]},
 		{Value: "ecommerce", Label: skillCategoryLabels["ecommerce"]},
 		{Value: "creative", Label: skillCategoryLabels["creative"]},
 		{Value: "social", Label: skillCategoryLabels["social"]},

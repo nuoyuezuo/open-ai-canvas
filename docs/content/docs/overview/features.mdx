@@ -335,3 +335,44 @@ SEO 标题、描述、可选关键词会投影到浏览器 metadata、Open Graph
 - `web/src/services/api/timeline-tasks.ts`：转写与渲染任务客户端。
 - `backend/internal/service/task_timeline.go`、`task_render.go`、`timeline_render_plan.go`、`transcription_whisper.go`：后端转写、渲染与渲染计划任务。
 - `backend/internal/repository/project_workbench_read.go`：项目概览指标聚合（含成片完成度计数）。
+
+## 漫画创作
+
+「漫画创作」（`/comic`）是面向黑白漫画的工作台，复用短剧的项目、章节、画格与产物链路，但阶段语义和产物槽位不同。章节 = `project_units`，画格 = `shots`，画格成稿 = `shot_artifacts`。生产流程为「原著与改编 → 角色与场景 → 分格脚本 → 成稿画面 → 交付与导出」。
+
+### 小说改编与防侵权
+
+漫画入口提供「小说改编」，支持两条路径：
+
+- **AI 检索现有小说**：先用文本模型把一句话创意收敛成检索条件（关键词、题材、排除条件），再查询部署者配置的外部资料库。检索结果只带摘要与短摘录，不返回全文。仍处于版权保护期或来源不明的作品必须先勾选确认授权，才能进入改编。
+- **自备文本**：上传 TXT / MD 或直接粘贴正文与详细梗概，由上传者自行承担版权责任。
+
+改编按 `novel-adaptation/v1` JSON 契约生成，契约把防侵权检查固化为必需字段：模型必须重建人物、世界观与情节，并显式列出仍然存在的相似点与需要人工复核的风险。缺少 `compliance` 字段时后端与前端都会拒绝结果，不提供兜底默认值。改编方案确认后可直接创建漫画项目并导入章节。
+
+外部资料库必须由管理员在「系统配置 → 小说资料库」显式配置接口地址后才会参与检索；未配置时检索返回空结果并提示用户改用自备文本。所有出站请求都经过 `internal/outbound` 的 SSRF 校验，默认拒绝本机、私网和链路本地地址。
+
+### 分格脚本与成稿画面
+
+- **分格脚本**：用文本模型把章节正文拆成可作画的画格，包含版面、景别、场景、出场角色、动作、对白/旁白/拟声与画面提示词。生成成功后整体替换本章画格，失败时不影响现有数据；已有画格时先确认替换影响。
+- **成稿画面**：在「漫画制作」工作台逐格生成黑白成稿，复用图片生成链路、资产绑定、版本历史与过期标记。生成使用画面提示词（图片阶段），与短剧的视频提示词分开。
+- **交付与导出**：门禁要求每格存在已确认的成稿画面，而不是逐格视频。当前只提供交付前检查，不提供交付包生成入口。
+
+创作过程可选择技能库中已添加的技能（`comic` 技能运行时 profile），由统一 Skill Runtime 按需读取并记录实际使用的版本和文件。技能库新增「漫画漫剧」分类，并内置三个默认技能：**漫画分格脚本**（章节拆成画格 JSON 契约）、**漫画成稿作画**（逐格统一角色与画风锚定后出图）、**小说改编合规方案**（重建人物/世界观/情节并输出相似点与风险）。用户也可在技能广场用「技能草稿」生成自己的 `comic` 技能后加入使用。
+
+### 相关实现
+
+- `web/src/pages/comic/`：项目列表、详情外壳、小说改编弹窗与分格脚本阶段。
+- `web/src/lib/comic/`：改编方案与分格脚本的解析、生成与写入转换。
+- `web/src/lib/project-workflow-profile.ts`：短剧与漫画的阶段、产物槽位、术语和技能 profile 描述。
+- `web/src/pages/projects/detail/project-workbench.tsx`：短剧与漫画共用的项目工作台外壳。
+- `backend/internal/novel/`、`backend/internal/app/settings_novel_library.go`：小说检索、版权状态归一与资料库配置。
+- `backend/internal/prompts/prompt_template_defaults.go`：`comic-panel-script/v1`、`novel-adaptation/v1`、`novel-search-query/v1` 受保护输出契约。
+
+## 漫剧创作（骨架）
+
+「漫剧创作」（`/comic-drama`）当前只提供入口与说明页，不接入生产链路。漫剧会复用漫画的分格脚本、画格成稿与角色资产，再补充镜头运动、配音和动态合成；在漫画流程完善前保持骨架状态，避免出现半成品的生产路径。已创建的漫剧项目会出现在漫画项目列表中。
+
+### 相关实现
+
+- `web/src/pages/comic-drama/index.tsx`：漫剧入口说明页。
+- `backend/internal/app/project_workflow.go`：漫剧当前复用 `comic-production` 工作流模板。

@@ -37,12 +37,15 @@ func RegisterCanvasAPI(api *gin.RouterGroup, svc *service.Service) {
 	RegisterTaskRoutes(api, svc)
 	RegisterRunningHubRoutes(api, svc)
 	RegisterSkillRoutes(api, svc)
+	RegisterNovelRoutes(api, svc)
 	RegisterUserDataRoutes(api, svc)
 	RegisterChunkedUploadRoutes(api, svc)
 	RegisterDiagnosticsRoutes(api, svc)
 	RegisterPluginRoutes(api, svc)
+	// 漫画沿用短剧的项目/章节/画格生产链路，因此共享同一组生产接口；
+	// 只要短剧、漫画或漫剧任一模块开放，生产接口就可用，具体项目类型在 service 内校验。
 	projectAPI := api.Group("")
-	projectAPI.Use(RequireFeature(svc, service.FeatureShortDrama))
+	projectAPI.Use(RequireAnyFeature(svc, service.FeatureShortDrama, service.FeatureComic, service.FeatureComicDrama))
 	RegisterProjectRoutes(projectAPI, svc)
 	RegisterCanvasShareRoutes(api, svc)
 }

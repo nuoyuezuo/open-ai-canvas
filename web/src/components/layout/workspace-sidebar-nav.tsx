@@ -41,13 +41,16 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 }
 
 function buildNav(features: FeatureAvailability, isAdmin: boolean): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
+    const storyItems: WorkspaceNavItem[] = [
+        { ...toolItem("create", "/"), id: "home", title: "创作" },
+        { ...toolItem("projects", "/projects"), title: "短剧 Agent" },
+        ...(features.comicEnabled ? [{ ...toolItem("comic", "/comic"), title: "漫画创作" }] : []),
+        ...(features.comicDramaEnabled ? [{ ...toolItem("comic-drama", "/comic-drama"), title: "漫剧创作" }] : []),
+        { ...toolItem("canvas", "/canvas"), title: "自由画布" },
+    ];
     const groups: WorkspaceNavGroup[] = [
         {
-            items: [
-                { ...toolItem("create", "/"), id: "home", title: "创作" },
-                { ...toolItem("projects", "/projects"), title: "短剧 Agent" },
-                { ...toolItem("canvas", "/canvas"), title: "自由画布" },
-            ],
+            items: storyItems,
         },
         {
             heading: "资源与工具",

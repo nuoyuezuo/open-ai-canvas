@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router
 
 import { RequireAuth } from "@/components/auth/require-auth";
 import { FullScreenLoader, WorkspaceRouteLoader } from "@/components/ui/aceternity/full-screen-loader";
-import { loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, loadCreatePage, loadProjectDetailPage, loadProjectsPage } from "@/lib/workspace-route-modules";
+import { loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, loadComicDetailPage, loadComicDramaPage, loadComicPage, loadCreatePage, loadProjectDetailPage, loadProjectsPage } from "@/lib/workspace-route-modules";
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
 import { AuthScene } from "@/pages/auth/auth-scene";
 import RouteErrorPage from "@/pages/route-error";
@@ -29,6 +29,7 @@ const AppearanceSettingsPage = lazy(() => import("@/pages/admin/settings/appeara
 const DrawingEngineSettingsPage = lazy(() => import("@/pages/admin/settings/drawing-engine-settings-page"));
 const StorageSettingsPage = lazy(() => import("@/pages/admin/settings/storage-settings-page"));
 const ArkPrivateAssetsSettingsPage = lazy(() => import("@/pages/admin/settings/ark-private-assets-settings-page"));
+const NovelLibrarySettingsPage = lazy(() => import("@/pages/admin/settings/novel-library-settings-page"));
 const ResponseInterceptionSettingsPage = lazy(() => import("@/pages/admin/settings/response-interception-settings-page"));
 const ThirdPartySettingsPage = lazy(() => import("@/pages/admin/settings/libtv-settings-page"));
 const SystemUpdatePage = lazy(() => import("@/pages/admin/settings/system-update-page"));
@@ -50,6 +51,9 @@ const EagleLibraryPage = lazy(() => import("@/pages/plugins/eagle"));
 const TasksPage = lazy(() => import("@/pages/tasks"));
 const ProjectsPage = lazy(loadProjectsPage);
 const ProjectDetailPage = lazy(loadProjectDetailPage);
+const ComicPage = lazy(loadComicPage);
+const ComicDetailPage = lazy(loadComicDetailPage);
+const ComicDramaPage = lazy(loadComicDramaPage);
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const TestVoiceRecording = lazy(() => import("@/pages/test-voice-recording"));
 const UserLayout = lazy(() => import("@/layouts/user-layout"));
@@ -177,6 +181,54 @@ export const router = createBrowserRouter([
                     </RequireAuth>
                 ),
             },
+            {
+                path: "/comic",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicEnabled">{deferred(<ComicPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/comic/:projectId",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicEnabled">{deferred(<ComicDetailPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/comic/:projectId/:view",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicEnabled">{deferred(<ComicDetailPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/comic/:projectId/chapters/:chapterId",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicEnabled">{deferred(<ComicDetailPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/comic/:projectId/workflow/:unitId/:stage",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicEnabled">{deferred(<ComicDetailPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/comic-drama",
+                element: (
+                    <RequireAuth>
+                        <RequireFeature feature="comicDramaEnabled">{deferred(<ComicDramaPage />)}</RequireFeature>
+                    </RequireAuth>
+                ),
+            },
             { path: "/canvas", element: <RequireAuth>{deferred(<CanvasPage />)}</RequireAuth> },
             { path: "/canvas/:id", element: <RequireAuth><CanvasProjectPage /></RequireAuth> },
             {
@@ -208,6 +260,7 @@ export const router = createBrowserRouter([
                     { path: "settings/email", element: <EmailSettingsPage /> },
                     { path: "settings/storage", element: <StorageSettingsPage /> },
                     { path: "settings/ark-private-assets", element: <ArkPrivateAssetsSettingsPage /> },
+                    { path: "settings/novel-library", element: <NovelLibrarySettingsPage /> },
                     { path: "settings/response-interception", element: <ResponseInterceptionSettingsPage /> },
                     { path: "settings/third-party", element: <ThirdPartySettingsPage /> },
                     { path: "settings/system-update", element: <SystemUpdatePage /> },

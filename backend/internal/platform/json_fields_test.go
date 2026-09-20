@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -59,5 +60,35 @@ func TestFirstJSONStringPrefersValidStringOverWrongType(t *testing.T) {
 	text, err = FirstJSONString(payload, "missing", "also-missing")
 	if err != nil || text != "" {
 		t.Fatalf("FirstJSONString(missing) = %q, %v", text, err)
+	}
+}
+
+// TestFeatureAvailabilityBackfillsComicFieldsForExistingSetting 覆盖升级场景：
+// 数据库里已有旧配置（没有 comicEnabled / comicDramaEnabled）时，新字段必须回填为默认开放，
+// 否则前端 parseFeatureAvailability 会因缺少布尔字段而整页报错，功能开放面板打不开。
+func TestFeatureAvailabilityBackfillsComicFieldsForExistingSetting(t *testing.T) {
+	value := DefaultFeatureAvailability()
+	legacy := `{"welcomeEnabled":true,"shortDramaEnabled":false,"taskCenterEnabled":false,"creditsEnabled":false,"customChannelsEnabled":false,"frontendModelsEnabled":false,"pluginCenterEnabled":false,"systemPluginsVisibleToUsers":false}`
+	if err := json.Unmarshal([]byte(legacy), &value); err != nil {
+		t.Fatalf("旧配置必须能被解析: %v", err)
+	}
+	if !value.ComicEnabled || !value.ComicDramaEnabled {
+		t.Fatalf("旧配置缺少漫画字段时应回填默认开放: %+v", value)
+	}
+	if value.ShortDramaEnabled || value.TaskCenterEnabled {
+		t.Fatalf("旧配置中已存在的字段不应被默认值覆盖: %+v", value)
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"comicEnabled", "comicDramaEnabled"} {
+		if _, ok := decoded[key].(bool); !ok {
+			t.Fatalf("序列化结果必须包含布尔字段 %s: %s", key, encoded)
+		}
 	}
 }

@@ -7,6 +7,9 @@ export const PromptTemplateOperation = {
     StoryboardFirstFrame: "storyboard_first_frame",
     StoryboardVideo: "storyboard_video",
     ShortDramaOutline: "short_drama_outline",
+    ComicPanelScript: "comic_panel_script",
+    NovelAdaptation: "novel_adaptation",
+    NovelSearchQuery: "novel_search_query",
     SkillDraft: "skill_draft",
 } as const;
 

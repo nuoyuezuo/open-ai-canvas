@@ -19,6 +19,7 @@ type RedeemCodeStatus string
 type AnnouncementStatus string
 type AnnouncementLevel string
 type ProjectStatus string
+type ProjectType string
 type ProjectUnitKind string
 type ProjectUnitStatus string
 type AssetCategory string
@@ -133,6 +134,11 @@ const (
 
 	ProjectStatusActive   ProjectStatus = "active"
 	ProjectStatusArchived ProjectStatus = "archived"
+
+	// ProjectType 决定项目使用哪套生产工作流和前端工作台；同一用户可以在三个入口下各建项目。
+	ProjectTypeShortDrama ProjectType = "short-drama"
+	ProjectTypeComic      ProjectType = "comic"
+	ProjectTypeComicDrama ProjectType = "comic-drama"
 
 	ProjectUnitKindChapter ProjectUnitKind = "chapter"
 	ProjectUnitKindEpisode ProjectUnitKind = "episode"

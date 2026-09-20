@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { App, Button, Skeleton } from "antd";
 import { Switch } from "@/pages/admin/ui/controls";
-import { AlertTriangle, Clapperboard, Coins, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, BookImage, Clapperboard, Coins, Film, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { AdminStatusBadge } from "./admin-ui";
 
-type FeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
+type FeatureKey = "shortDramaEnabled" | "comicEnabled" | "comicDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
 type FeatureRow = {
     key: FeatureKey;
     title: string;
@@ -17,7 +17,7 @@ type FeatureRow = {
     dependsOn?: FeatureKey;
 };
 
-const editableFeatureKeys: FeatureKey[] = ["shortDramaEnabled", "taskCenterEnabled", "creditsEnabled", "customChannelsEnabled", "frontendModelsEnabled", "pluginCenterEnabled", "systemPluginsVisibleToUsers"];
+const editableFeatureKeys: FeatureKey[] = ["shortDramaEnabled", "comicEnabled", "comicDramaEnabled", "taskCenterEnabled", "creditsEnabled", "customChannelsEnabled", "frontendModelsEnabled", "pluginCenterEnabled", "systemPluginsVisibleToUsers"];
 
 const workspaceFeatureRows: FeatureRow[] = [
     {
@@ -25,6 +25,18 @@ const workspaceFeatureRows: FeatureRow[] = [
         title: "短剧创作",
         description: "开放短剧入口、项目列表与项目详情。关闭不删除已有项目。",
         icon: <Clapperboard className="size-4" aria-hidden="true" />,
+    },
+    {
+        key: "comicEnabled",
+        title: "漫画创作",
+        description: "开放漫画入口、漫画项目与分格制作。关闭不删除已有项目。",
+        icon: <BookImage className="size-4" aria-hidden="true" />,
+    },
+    {
+        key: "comicDramaEnabled",
+        title: "漫剧创作",
+        description: "开放漫剧入口。漫剧复用漫画分格链路，模块完善后独立演进。",
+        icon: <Film className="size-4" aria-hidden="true" />,
     },
     {
         key: "taskCenterEnabled",
@@ -245,7 +257,7 @@ export default function FeatureAvailabilityPanel() {
                     title="1. 用户工作台入口"
                     description="先决定普通用户能进入哪些核心工作区"
                     icon={<MonitorCog className="size-4" aria-hidden="true" />}
-                    status={<AdminStatusBadge label={`${enabledWorkspaceFeatures}/4 开放`} tone={enabledWorkspaceFeatures === 4 ? "success" : "neutral"} />}
+                    status={<AdminStatusBadge label={`${enabledWorkspaceFeatures}/${workspaceFeatureRows.length} 开放`} tone={enabledWorkspaceFeatures === workspaceFeatureRows.length ? "success" : "neutral"} />}
                 >
                     {workspaceFeatureRows.map((row) => (
                         <FeatureSettingRow key={row.key} row={row} saved={savedFeatures} draft={draftFeatures} saving={saving} onChange={requestFeatureChange} />
@@ -348,6 +360,8 @@ function effectiveFeatureValue(features: FeatureAvailability, key: FeatureKey) {
 function toEditablePayload(features: FeatureAvailability) {
     return {
         shortDramaEnabled: features.shortDramaEnabled,
+        comicEnabled: features.comicEnabled,
+        comicDramaEnabled: features.comicDramaEnabled,
         taskCenterEnabled: features.taskCenterEnabled,
         creditsEnabled: features.creditsEnabled,
         customChannelsEnabled: features.customChannelsEnabled,
@@ -370,6 +384,8 @@ function parseFeatureAvailability(value: unknown): FeatureAvailability {
     return {
         welcomeEnabled: record.welcomeEnabled as boolean,
         shortDramaEnabled: record.shortDramaEnabled as boolean,
+        comicEnabled: record.comicEnabled as boolean,
+        comicDramaEnabled: record.comicDramaEnabled as boolean,
         taskCenterEnabled: record.taskCenterEnabled as boolean,
         creditsEnabled: record.creditsEnabled as boolean,
         customChannelsEnabled: record.customChannelsEnabled as boolean,

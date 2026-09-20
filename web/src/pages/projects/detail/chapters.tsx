@@ -56,6 +56,8 @@ import { ModelPicker } from "@/components/model-picker";
 import { WorkspaceState } from "@/components/layout/workspace-state";
 import { resolveProjectCanvasStyle } from "@/components/canvas/canvas-style-picker-modal";
 import { decodeNovelText, splitTextIntoChapters } from "@/lib/canvas/canvas-document";
+import { projectRoute, useProjectRouteBase } from "@/lib/project-route-base";
+import { useProjectWorkflowProfile } from "@/lib/project-workflow-profile";
 import { navigateToSettings } from "@/lib/settings-navigation";
 import {
     createProjectAssetCandidates,
@@ -88,6 +90,9 @@ function formatChapterListCount(value: number) {
 export default function ProjectChaptersView({ detail, refreshProject }: ProjectDetailViewProps) {
     const { message, modal } = App.useApp();
     const navigate = useNavigate();
+    const routeBase = useProjectRouteBase();
+    // 漫画章节不做短剧分镜：画格由「分格脚本」阶段生成，这里只维护原著正文与角色资产。
+    const isComic = useProjectWorkflowProfile().id === "comic";
     const queryClient = useQueryClient();
     const { chapterId = "" } = useParams();
     const initialSelectedId = detail.units.some((unit) => unit.id === chapterId) ? chapterId : detail.units[0]?.id || "";
@@ -191,7 +196,7 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
     useEffect(() => {
         if (!chapterId || dirty || detail.units.some((unit) => unit.id === chapterId)) return;
         const firstId = orderedUnits[0]?.id;
-        navigate(firstId ? `/projects/${detail.project.id}/chapters/${firstId}` : `/projects/${detail.project.id}/chapters`, { replace: true });
+        navigate(projectRoute(routeBase, detail.project.id, "chapters", firstId), { replace: true });
     }, [chapterId, detail.project.id, detail.units, dirty, navigate, orderedUnits]);
 
     useEffect(() => {
@@ -233,12 +238,12 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
     });
     const createMutation = useMutation({
         mutationFn: (values: { title: string; sourceText?: string }) => createProjectUnit(detail.project.id, { kind: "chapter", title: values.title, sourceText: plainTextToHtml(values.sourceText || ""), position: detail.units.length }),
-        onSuccess: ({ unit }) => { setCreateOpen(false); setSelectedId(unit.id); refreshProject(); navigate(`/projects/${detail.project.id}/chapters/${unit.id}`); message.success("章节已创建"); },
+        onSuccess: ({ unit }) => { setCreateOpen(false); setSelectedId(unit.id); refreshProject(); navigate(projectRoute(routeBase, detail.project.id, "chapters", unit.id)); message.success("章节已创建"); },
         onError: (error) => message.error(error instanceof Error ? error.message : "章节创建失败"),
     });
     const importMutation = useMutation({
         mutationFn: (chapters: Array<{ title: string; plainText: string }>) => importProjectUnits(detail.project.id, chapters.map((chapter) => ({ kind: "chapter", title: chapter.title, sourceText: plainTextToHtml(chapter.plainText) }))),
-        onSuccess: ({ units }) => { setImportOpen(false); if (units[0]) { setSelectedId(units[0].id); navigate(`/projects/${detail.project.id}/chapters/${units[0].id}`); } refreshProject(); message.success(`已导入 ${units.length} 章`); },
+        onSuccess: ({ units }) => { setImportOpen(false); if (units[0]) { setSelectedId(units[0].id); navigate(projectRoute(routeBase, detail.project.id, "chapters", units[0].id)); } refreshProject(); message.success(`已导入 ${units.length} 章`); },
         onError: (error) => message.error(error instanceof Error ? error.message : "小说导入失败"),
     });
     const reorderMutation = useMutation({
@@ -255,7 +260,7 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
             if (selectedId === unitId) {
                 const nextId = remaining[Math.min(index, remaining.length - 1)] || "";
                 setSelectedId(nextId);
-                navigate(nextId ? `/projects/${detail.project.id}/chapters/${nextId}` : `/projects/${detail.project.id}/chapters`, { replace: true });
+                navigate(projectRoute(routeBase, detail.project.id, "chapters", nextId), { replace: true });
             }
             refreshProject();
             message.success("章节已删除");
@@ -434,7 +439,7 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
             }, { onTaskUpdate: (task) => updateChapterOperation(unit.id, "storyboard", task) });
             const shotCount = await storeGeneratedStoryboard(unit.id, result.rows);
             message.success(result.skillCount ? `已生成 ${shotCount} 个分镜，并应用 ${result.skillCount} 个技能` : `已生成 ${shotCount} 个分镜`);
-            navigate(`/projects/${detail.project.id}/workflow/${unit.id}/storyboard`);
+            navigate(projectRoute(routeBase, detail.project.id, "workflow", unit.id, "storyboard"));
         } catch (error) {
             refreshProject();
             message.error(error instanceof Error ? `章节分镜生成失败：${error.message}` : "章节分镜生成失败");
@@ -496,7 +501,7 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
         if (dirty) { message.warning("请先保存当前章节，再切换章节"); return; }
         setSelectedId(unitId);
         sessionStorage.setItem(`project-active-chapter:${detail.project.id}`, unitId);
-        navigate(`/projects/${detail.project.id}/chapters/${unitId}`);
+        navigate(projectRoute(routeBase, detail.project.id, "chapters", unitId));
     };
     const moveChapter = (targetId: string) => {
         if (!draggedId || draggedId === targetId || reorderMutation.isPending) return;
@@ -601,7 +606,11 @@ export default function ProjectChaptersView({ detail, refreshProject }: ProjectD
                             </div>
                             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                                 <Button size="small" icon={<UsersRound className="size-3.5" />} disabled={!selectedUnit || dirty || Boolean(characterOperation)} loading={Boolean(characterOperation)} onClick={() => { setSelectedTextModel(effectiveConfig.textModel || effectiveConfig.model || effectiveConfig.textModels[0] || ""); setCharacterExtractOpen(true); }} aria-label={characterOperation ? `提取角色、场景与道具，已运行 ${formatOperationElapsed(characterOperation.startedAt, operationNow)}` : "提取角色、场景与道具"}>{characterOperation ? `提取资产（已运行${formatOperationElapsed(characterOperation.startedAt, operationNow)}）` : charactersGenerated ? "提取资产（已生成）" : "提取角色、场景与道具"}</Button>
-                                <Button size="small" type="primary" icon={<Clapperboard className="size-3.5" />} disabled={!selectedUnit || dirty || Boolean(storyboardOperation)} loading={Boolean(storyboardOperation)} onClick={() => { setSelectedTextModel(effectiveConfig.textModel || effectiveConfig.model || effectiveConfig.textModels[0] || ""); setSelectedSkillIds([]); setStoryboardOpen(true); }} aria-label={storyboardOperation ? `生成到分镜制作，已运行 ${formatOperationElapsed(storyboardOperation.startedAt, operationNow)}` : "生成到分镜制作"}>{storyboardOperation ? `生成到分镜制作（已运行${formatOperationElapsed(storyboardOperation.startedAt, operationNow)}）` : storyboardGenerated ? "生成到分镜制作（已生成）" : "生成到分镜制作"}</Button>
+                                {isComic ? (
+                                    <Button size="small" type="primary" icon={<Clapperboard className="size-3.5" />} disabled={!selectedUnit || dirty} onClick={() => navigate(projectRoute(routeBase, detail.project.id, "workflow", selectedUnit.id, "panels"))}>去生成分格脚本</Button>
+                                ) : (
+                                    <Button size="small" type="primary" icon={<Clapperboard className="size-3.5" />} disabled={!selectedUnit || dirty || Boolean(storyboardOperation)} loading={Boolean(storyboardOperation)} onClick={() => { setSelectedTextModel(effectiveConfig.textModel || effectiveConfig.model || effectiveConfig.textModels[0] || ""); setSelectedSkillIds([]); setStoryboardOpen(true); }} aria-label={storyboardOperation ? `生成到分镜制作，已运行 ${formatOperationElapsed(storyboardOperation.startedAt, operationNow)}` : "生成到分镜制作"}>{storyboardOperation ? `生成到分镜制作（已运行${formatOperationElapsed(storyboardOperation.startedAt, operationNow)}）` : storyboardGenerated ? "生成到分镜制作（已生成）" : "生成到分镜制作"}</Button>
+                                )}
                                 <Button size="small" type={dirty ? "primary" : "default"} icon={dirty ? <Save className="size-3.5" /> : <Check className="size-3.5" />} disabled={!selectedUnit || !dirty || !draftTitle.trim() || saveMutation.isPending} loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>{dirty ? "保存" : "已保存"}</Button>
                             </div>
                         </header>

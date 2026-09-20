@@ -1,13 +1,15 @@
-import { http } from "@/services/api/request";
+import { compactApiParams, http } from "@/services/api/request";
 import { normalizeAssetCategory, type AssetCategory } from "@/lib/asset-category";
 import type { GenerationTask } from "@/services/api/task-center";
 
+/** 后端项目类型；漫剧当前复用漫画生产链路，但保留独立类型。 */
+export type ProjectType = "short-drama" | "comic" | "comic-drama";
 
 export type Project = {
     id: string;
     userId: string;
     name: string;
-    type: string;
+    type: ProjectType | string;
     aspectRatio: string;
     sourceType: string;
     description: string;
@@ -330,9 +332,10 @@ export type ProjectAssetCandidatePage = {
 };
 
 export function listProjects(): Promise<{ projects: ProjectSummary[] }>;
-export function listProjects(params: { page: number; pageSize: number }): Promise<ProjectListPage>;
-export function listProjects(params?: { page: number; pageSize: number }) {
-    return http.get<{ projects: ProjectSummary[] } | ProjectListPage>("/projects", params ? { params: { page: params.page, pageSize: params.pageSize } } : undefined);
+export function listProjects(params: { page: number; pageSize: number; type?: ProjectType }): Promise<ProjectListPage>;
+export function listProjects(params?: { page?: number; pageSize?: number; type?: ProjectType }) {
+    // 工作台入口按项目类型隔离列表；不传 type 时保持后端默认（全部类型）。
+    return http.get<{ projects: ProjectSummary[] } | ProjectListPage>("/projects", params ? { params: compactApiParams({ page: params.page, pageSize: params.pageSize, type: params.type }) } : undefined);
 }
 
 export function getProject(id: string) {
@@ -431,7 +434,7 @@ function normalizeProjectDetail(detail: ProjectDetail): ProjectDetail {
     };
 }
 
-export function createProject(input: { name: string; type: string; aspectRatio: string; sourceType: string; description?: string; stylePresetId?: string; styleProfileJson?: string; defaultImageModel?: string; defaultVideoModel?: string }) {
+export function createProject(input: { name: string; type: ProjectType; aspectRatio: string; sourceType: string; description?: string; stylePresetId?: string; styleProfileJson?: string; defaultImageModel?: string; defaultVideoModel?: string }) {
     return http.post<{ project: Project }>("/projects", input);
 }
 

@@ -15,6 +15,8 @@ import (
 
 const builtinShortDramaWorkflowKey = "short-drama-production"
 const builtinShortDramaWorkflowVersion = 2
+const builtinComicWorkflowKey = "comic-production"
+const builtinComicWorkflowVersion = 1
 
 type workflowStepDefinition struct {
 	Key  string `json:"key"`
@@ -28,6 +30,16 @@ var builtinShortDramaSteps = []workflowStepDefinition{
 	{Key: "previz", Name: "黑白动作预演"},
 	{Key: "video", Name: "视频生成"},
 	{Key: "delivery", Name: "交付与打包"},
+}
+
+// 漫画把「分格脚本」和「成稿画面」拆成两个阶段：先确认每格叙事与版面，再逐格出图，
+// 这样重跑画面不会连带推翻已经确认的分格结构。对白与拟声属于成稿画面的一部分。
+var builtinComicSteps = []workflowStepDefinition{
+	{Key: "story", Name: "原著与改编"},
+	{Key: "assets", Name: "角色与场景"},
+	{Key: "panels", Name: "分格脚本"},
+	{Key: "inking", Name: "成稿画面"},
+	{Key: "delivery", Name: "交付与导出"},
 }
 
 type ProjectWorkflowDetail struct {
@@ -56,22 +68,39 @@ type RegisterTaskOutputRequest struct {
 	OutputJSON     string `json:"outputJson"`
 }
 
-func (s *Service) EnsureBuiltinProjectWorkflowTemplate() error {
-	if _, err := s.repo.WorkflowTemplateVersion(builtinShortDramaWorkflowKey, builtinShortDramaWorkflowVersion); err == nil {
-		return nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+// 内置工作流模板按项目类型选择；漫画与短剧的阶段语义不同，不能共用一个模板。
+// 漫剧当前复用漫画分格流程，等漫剧模块落地后再拆分独立模板。
+func workflowTemplateKeyForProjectType(projectType string) (string, int, []workflowStepDefinition, string) {
+	switch model.ProjectType(strings.TrimSpace(projectType)) {
+	case model.ProjectTypeComic, model.ProjectTypeComicDrama:
+		return builtinComicWorkflowKey, builtinComicWorkflowVersion, builtinComicSteps, "漫画分格工作流"
 	}
-	definition, err := json.Marshal(map[string]any{"scope": []string{"project", "unit"}, "steps": builtinShortDramaSteps})
-	if err != nil {
-		return err
-	}
-	template := model.WorkflowTemplateVersion{ID: newID(), TemplateKey: builtinShortDramaWorkflowKey, Name: "短剧分镜工作流", Version: builtinShortDramaWorkflowVersion, DefinitionJSON: string(definition), CreatedAt: time.Now()}
-	return s.repo.CreateWorkflowTemplateVersion(&template)
+	return builtinShortDramaWorkflowKey, builtinShortDramaWorkflowVersion, builtinShortDramaSteps, "短剧分镜工作流"
 }
 
-func (s *Service) createProjectWorkflow(projectID string, unitID string, scope string) (ProjectWorkflowDetail, error) {
-	template, err := s.repo.WorkflowTemplateVersion(builtinShortDramaWorkflowKey, builtinShortDramaWorkflowVersion)
+func (s *Service) EnsureBuiltinProjectWorkflowTemplate() error {
+	for _, projectType := range []model.ProjectType{model.ProjectTypeShortDrama, model.ProjectTypeComic} {
+		key, version, steps, name := workflowTemplateKeyForProjectType(string(projectType))
+		if _, err := s.repo.WorkflowTemplateVersion(key, version); err == nil {
+			continue
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		definition, err := json.Marshal(map[string]any{"scope": []string{"project", "unit"}, "steps": steps})
+		if err != nil {
+			return err
+		}
+		template := model.WorkflowTemplateVersion{ID: newID(), TemplateKey: key, Name: name, Version: version, DefinitionJSON: string(definition), CreatedAt: time.Now()}
+		if err := s.repo.CreateWorkflowTemplateVersion(&template); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) createProjectWorkflow(projectType string, projectID string, unitID string, scope string) (ProjectWorkflowDetail, error) {
+	templateKey, templateVersion, steps, _ := workflowTemplateKeyForProjectType(projectType)
+	template, err := s.repo.WorkflowTemplateVersion(templateKey, templateVersion)
 	if err != nil {
 		return ProjectWorkflowDetail{}, err
 	}
@@ -83,21 +112,21 @@ func (s *Service) createProjectWorkflow(projectID string, unitID string, scope s
 	}
 	now := time.Now()
 	instance := model.WorkflowInstance{ID: newID(), ProjectID: projectID, UnitID: unitID, TemplateVersionID: template.ID, Scope: scope, Status: model.WorkflowStatusActive, Revision: 1, CreatedAt: now, UpdatedAt: now}
-	steps := make([]model.WorkflowStepInstance, 0, len(builtinShortDramaSteps))
-	for index, definition := range builtinShortDramaSteps {
+	instances := make([]model.WorkflowStepInstance, 0, len(steps))
+	for index, definition := range steps {
 		status := model.WorkflowStepStatusPending
 		if index == 0 {
 			status = model.WorkflowStepStatusReady
 		}
-		steps = append(steps, model.WorkflowStepInstance{ID: newID(), WorkflowInstanceID: instance.ID, StepKey: definition.Key, Name: definition.Name, Position: index, Status: status, InputJSON: "{}", OutputJSON: "{}", CreatedAt: now, UpdatedAt: now})
+		instances = append(instances, model.WorkflowStepInstance{ID: newID(), WorkflowInstanceID: instance.ID, StepKey: definition.Key, Name: definition.Name, Position: index, Status: status, InputJSON: "{}", OutputJSON: "{}", CreatedAt: now, UpdatedAt: now})
 	}
-	if err := s.repo.CreateWorkflowInstance(&instance, steps); err != nil {
+	if err := s.repo.CreateWorkflowInstance(&instance, instances); err != nil {
 		return ProjectWorkflowDetail{}, err
 	}
 	if err := s.repo.BumpProjectRevision(projectID); err != nil {
 		return ProjectWorkflowDetail{}, err
 	}
-	return ProjectWorkflowDetail{Instance: instance, Steps: steps}, nil
+	return ProjectWorkflowDetail{Instance: instance, Steps: instances}, nil
 }
 
 func (s *Service) ProjectWorkflows(projectID string) ([]ProjectWorkflowDetail, error) {
@@ -123,11 +152,16 @@ func (s *Service) CreateUnitWorkflow(userID string, projectID string, unitID str
 	if _, err := s.repo.ProjectUnit(projectID, unitID); err != nil {
 		return ProjectWorkflowDetail{}, err
 	}
-	return s.createProjectWorkflow(projectID, unitID, "unit")
+	project, err := s.repo.ProjectForUser(userID, projectID)
+	if err != nil {
+		return ProjectWorkflowDetail{}, err
+	}
+	return s.createProjectWorkflow(project.Type, projectID, unitID, "unit")
 }
 
 func (s *Service) UpdateWorkflowStep(userID string, projectID string, stepID string, req UpdateWorkflowStepRequest) (model.WorkflowStepInstance, error) {
-	if _, err := s.activeProjectForUser(userID, projectID); err != nil {
+	project, err := s.activeProjectForUser(userID, projectID)
+	if err != nil {
 		return model.WorkflowStepInstance{}, err
 	}
 	step, err := s.repo.WorkflowStepForProject(projectID, stepID)
@@ -162,7 +196,7 @@ func (s *Service) UpdateWorkflowStep(userID string, projectID string, stepID str
 		return model.WorkflowStepInstance{}, err
 	}
 	if status == model.WorkflowStepStatusCompleted {
-		if err := s.validateWorkflowStepCompletion(projectID, instance, step); err != nil {
+		if err := s.validateWorkflowStepCompletion(projectID, model.ProjectType(project.Type), instance, step); err != nil {
 			return model.WorkflowStepInstance{}, err
 		}
 	}
@@ -333,7 +367,7 @@ func (s *Service) RegisterTaskOutput(userID string, projectID string, stepID str
 	return *step, nil
 }
 
-func (s *Service) validateWorkflowStepCompletion(projectID string, instance *model.WorkflowInstance, step *model.WorkflowStepInstance) error {
+func (s *Service) validateWorkflowStepCompletion(projectID string, projectType model.ProjectType, instance *model.WorkflowInstance, step *model.WorkflowStepInstance) error {
 	if instance == nil || strings.TrimSpace(instance.UnitID) == "" {
 		return nil
 	}
@@ -356,7 +390,7 @@ func (s *Service) validateWorkflowStepCompletion(projectID string, instance *mod
 				return BadAuthRequest("仍有待确认资产，不能完成资产拆分阶段")
 			}
 		}
-	case "storyboard", "previz", "video", "delivery":
+	case "storyboard", "previz", "video", "panels", "inking", "delivery":
 		shots, shotErr := s.repo.ProjectShots(projectID)
 		if shotErr != nil {
 			return shotErr
@@ -368,18 +402,23 @@ func (s *Service) validateWorkflowStepCompletion(projectID string, instance *mod
 			}
 		}
 		if len(unitShots) == 0 {
-			return BadAuthRequest("当前章节还没有分镜，不能完成本阶段")
+			return BadAuthRequest("当前章节还没有画格或分镜，不能完成本阶段")
 		}
-		if step.StepKey == "storyboard" {
+		if step.StepKey == "storyboard" || step.StepKey == "panels" {
 			for _, shot := range unitShots {
 				if strings.TrimSpace(shot.CurrentRevisionID) == "" {
-					return BadAuthRequest("存在没有分镜版本的镜头，不能完成分镜阶段")
+					return BadAuthRequest("存在没有脚本版本的画格或镜头，不能完成本阶段")
 				}
 			}
 			return nil
 		}
+		// 漫画成稿画面复用 storyboard 产物槽位；漫画交付要求成稿画面而不是逐格视频，
+		// 这里按项目类型判定，避免漫画章节被短剧的视频门禁卡住。
+		comicProject := IsComicProjectType(string(projectType))
 		artifactType := "action_board"
-		if step.StepKey == "video" || step.StepKey == "delivery" {
+		if step.StepKey == "inking" || (comicProject && step.StepKey == "delivery") {
+			artifactType = "storyboard"
+		} else if step.StepKey == "video" || step.StepKey == "delivery" {
 			artifactType = "video"
 		}
 		artifacts, artifactErr := s.repo.ProjectShotArtifacts(projectID)
@@ -393,6 +432,9 @@ func (s *Service) validateWorkflowStepCompletion(projectID string, instance *mod
 			}
 		}
 		if len(readyShots) != len(unitShots) {
+			if artifactType == "storyboard" {
+				return BadAuthRequest("仍有画格缺少已确认的成稿画面，不能完成本阶段")
+			}
 			if artifactType == "action_board" {
 				return BadAuthRequest("仍有镜头缺少已通过的动作预演，不能完成本阶段")
 			}
@@ -404,12 +446,16 @@ func (s *Service) validateWorkflowStepCompletion(projectID string, instance *mod
 
 func workflowArtifactType(stepKey string) string {
 	switch strings.TrimSpace(stepKey) {
-	case "storyboard":
+	case "storyboard", "panels":
 		return "storyboard"
 	case "previz":
 		return "action_board"
 	case "video":
 		return "video"
+	// 漫画成稿画面写入 storyboard 槽位，与 validateWorkflowStepCompletion 的 inking 校验保持一致；
+	// 交付阶段复用 video 槽位承载整章导出结果。
+	case "inking":
+		return "storyboard"
 	case "delivery":
 		return "delivery"
 	default:

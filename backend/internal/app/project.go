@@ -98,16 +98,31 @@ type ProjectDetail struct {
 	Tasks           []TaskSummary                 `json:"tasks"`
 }
 
-func (s *Service) ListProjects(userID string) ([]ProjectSummary, error) {
-	projects, err := s.repo.Projects(userID)
+// projectTypeFilter 把入口类型映射成数据库过滤条件；空值表示不限制类型。
+func projectTypeFilter(projectType string) []string {
+	switch model.ProjectType(strings.TrimSpace(projectType)) {
+	case model.ProjectTypeShortDrama:
+		return []string{string(model.ProjectTypeShortDrama)}
+	case model.ProjectTypeComic:
+		// 漫剧当前复用漫画工作台，漫画入口同时列出两者，避免已有漫剧项目消失。
+		return []string{string(model.ProjectTypeComic), string(model.ProjectTypeComicDrama)}
+	case model.ProjectTypeComicDrama:
+		return []string{string(model.ProjectTypeComicDrama)}
+	default:
+		return nil
+	}
+}
+
+func (s *Service) ListProjects(userID string, projectType string) ([]ProjectSummary, error) {
+	projects, err := s.repo.Projects(userID, projectTypeFilter(projectType))
 	if err != nil {
 		return nil, err
 	}
 	return s.summarizeProjects(userID, projects)
 }
 
-func (s *Service) ListProjectsPage(userID string, page int, pageSize int) (ProjectListPage, error) {
-	projects, total, err := s.repo.ProjectsPage(userID, page, pageSize)
+func (s *Service) ListProjectsPage(userID string, projectType string, page int, pageSize int) (ProjectListPage, error) {
+	projects, total, err := s.repo.ProjectsPage(userID, projectTypeFilter(projectType), page, pageSize)
 	if err != nil {
 		return ProjectListPage{}, err
 	}
@@ -225,7 +240,10 @@ func (s *Service) CreateProject(userID string, req CreateProjectRequest) (model.
 	}
 	projectType := strings.TrimSpace(req.Type)
 	if projectType == "" {
-		projectType = "short-drama"
+		projectType = string(model.ProjectTypeShortDrama)
+	}
+	if !validProjectType(projectType) {
+		return model.Project{}, BadAuthRequest("不支持的项目类型")
 	}
 	aspectRatio := strings.TrimSpace(req.AspectRatio)
 	if aspectRatio == "" {
@@ -256,7 +274,7 @@ func (s *Service) CreateProject(userID string, req CreateProjectRequest) (model.
 	if err := s.repo.CreateProject(&project); err != nil {
 		return model.Project{}, err
 	}
-	if _, err := s.createProjectWorkflow(project.ID, "", "project"); err != nil {
+	if _, err := s.createProjectWorkflow(project.Type, project.ID, "", "project"); err != nil {
 		if deleteErr := s.repo.DeleteProject(userID, project.ID, nil); deleteErr != nil {
 			return model.Project{}, errors.Join(err, fmt.Errorf("项目初始化失败，回滚项目记录失败：%w", deleteErr))
 		}
@@ -628,6 +646,47 @@ func canvasPayloadWithoutProject(payloadJSON string, updatedAt time.Time) (strin
 
 func IsProjectNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
+}
+
+func validProjectType(value string) bool {
+	switch model.ProjectType(strings.TrimSpace(value)) {
+	case model.ProjectTypeShortDrama, model.ProjectTypeComic, model.ProjectTypeComicDrama:
+		return true
+	default:
+		return false
+	}
+}
+
+// 漫画沿用短剧的章节、镜头和产物结构：一章对应一段原著正文，一个镜头对应一个画格，
+// 这样分格脚本、资产绑定和产物版本控制都能直接复用既有生产链路。
+func IsComicProjectType(value string) bool {
+	projectType := model.ProjectType(strings.TrimSpace(value))
+	return projectType == model.ProjectTypeComic || projectType == model.ProjectTypeComicDrama
+}
+
+// RequireProjectTypeFeature 按项目类型校验对应模块是否开放。
+// 空类型表示未指定，沿用短剧入口语义；未知类型在创建时会单独拒绝。
+func (s *Service) RequireProjectTypeFeature(projectType string) error {
+	switch model.ProjectType(strings.TrimSpace(projectType)) {
+	case model.ProjectTypeComic:
+		return s.RequireFeature(FeatureComic)
+	case model.ProjectTypeComicDrama:
+		return s.RequireFeature(FeatureComicDrama)
+	case model.ProjectTypeShortDrama, "":
+		return s.RequireFeature(FeatureShortDrama)
+	default:
+		return BadAuthRequest("不支持的项目类型")
+	}
+}
+
+// RequireProjectFeatureForUser 校验已存在项目的模块开放状态，防止用户绕过入口
+// 直接通过项目 ID 访问已关闭模块的生产数据。项目不存在时返回归属错误，不泄露类型。
+func (s *Service) RequireProjectFeatureForUser(userID string, projectID string) error {
+	project, err := s.repo.ProjectForUser(userID, projectID)
+	if err != nil {
+		return err
+	}
+	return s.RequireProjectTypeFeature(project.Type)
 }
 
 // 任务仍以画布 ID 作为 projectId；写入前必须解析到业务项目并阻止归档项目继续生成。

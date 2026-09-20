@@ -15,6 +15,9 @@ const (
 	OperationCharacterTurnaround  = "character_turnaround"
 	OperationShortDramaOutline    = "short_drama_outline"
 	OperationSkillDraft           = "skill_draft"
+	OperationComicPanelScript     = "comic_panel_script"
+	OperationNovelAdaptation      = "novel_adaptation"
+	OperationNovelSearchQuery     = "novel_search_query"
 )
 
 const legacyStoryboardVideoPromptPreamble = "生成单一连续镜头的视频执行提示词。一个镜头只保留一个叙事目标、一个主运镜和一条主要动作链；摄影机运动必须有起点、动机和停止点。优先保证角色身份、表演、关键动作和连续性，次要环境效果可以简化。\n\n"
@@ -113,7 +116,26 @@ func defaultPromptDefinitions() []PromptOperationDefinition {
 			Operation: OperationSkillDraft, Label: "技能草稿", Category: "技能", OutputType: "json", SchemaKey: "skill-draft/v1",
 			Description:    "根据用户想法生成可复用创作技能的名称、分类、简介和指令草稿。",
 			Variables:      []PromptTemplateVariable{},
-			DefaultContent: `你是一位技能编写助手。根据用户的想法，为一个「可复用的创作技能」生成一份草稿。技能名称简短，不超过 20 个字。分类 tag 必须是 drama、ecommerce、creative、social、others 之一。简介不超过 120 字，说明适用场景、输入条件和最终产出。指令使用 Markdown，至少 300 字，写给后续在画布中使用该技能的模型阅读，必须包含角色设定、输入与约束、分步执行流程、检查清单和输出格式。工具步骤只描述所需能力、输入、输出和确认点，不虚构具体工具名，不把工具、节点、权限、预算或审批写成技能授予的能力；执行时始终以运行环境实际暴露的能力清单为准。`,
+			DefaultContent: `你是一位技能编写助手。根据用户的想法，为一个「可复用的创作技能」生成一份草稿。技能名称简短，不超过 20 个字。分类 tag 必须是 drama、comic、ecommerce、creative、social、others 之一。简介不超过 120 字，说明适用场景、输入条件和最终产出。指令使用 Markdown，至少 300 字，写给后续在画布中使用该技能的模型阅读，必须包含角色设定、输入与约束、分步执行流程、检查清单和输出格式。工具步骤只描述所需能力、输入、输出和确认点，不虚构具体工具名，不把工具、节点、权限、预算或审批写成技能授予的能力；执行时始终以运行环境实际暴露的能力清单为准。`,
+		},
+		{
+			Operation: OperationComicPanelScript, Label: "漫画分格脚本", Category: "漫画", OutputType: "json", SchemaKey: "comic-panel-script/v1",
+			Description:    "把章节正文拆成可直接出图的黑白漫画分格脚本，包含画格、对白与提示词。",
+			Variables:      []PromptTemplateVariable{{Label: "项目名称", Placeholder: "{{项目名称}}"}, {Label: "章节名称", Placeholder: "{{章节名称}}"}, {Label: "项目画风", Placeholder: "{{项目画风}}"}},
+			DefaultContent: `你是资深漫画分镜师。把章节正文拆成可以直接交付作画的分格脚本，保持原作剧情因果、人物关系和关键对白完整。每一格只承担一个叙事节拍，明确画格形状与版面位置、镜头景别、人物动作与表情、场景与道具、视觉焦点和翻页钩子。对白只写该格实际出现的文字，包括对白、旁白、拟声和气泡类型；超长对白必须拆格或精简，不得用旁白承载大段叙述。画面描述必须继承项目画风，角色外观、服装、发型和道具在相邻画格间保持一致。`,
+		},
+		{
+			Operation: OperationNovelAdaptation, Label: "小说改编", Category: "漫画", OutputType: "json", SchemaKey: "novel-adaptation/v1",
+			Description: "把检索到的原作或用户提供的小说改编为可规避侵权风险的原创漫画故事方案。",
+			// 原作素材只放摘要与短摘录；受保护上下文会再次带上同一份素材，避免模板被改写后丢失输入。
+			Variables:      []PromptTemplateVariable{{Label: "改编要求", Placeholder: "{{改编要求}}"}, {Label: "原作素材", Placeholder: "{{原作素材}}"}},
+			DefaultContent: `你是漫画改编编剧与版权合规编辑。把用户提供的原作素材改编为可独立创作、不构成侵权的原创漫画故事方案。改编要求：{{改编要求}}。改编原则：第一，只保留高度抽象的通用母题、题材类型和情感结构，不复制原作的专有名称、人名、地名、组织名、招式名、标志性台词和独特设定名词。第二，重建人物，为每个角色设计新的姓名、身份、外貌、性格与关系网络，避免与原作角色形成可识别的一一对应。第三，重建世界观与情节，改变时代背景、地域、社会结构、能力体系或事件顺序中的至少两项，重新组织冲突与高潮，让剧情走向由新的因果链驱动。第四，不使用原作独有的组合特征（角色外观、能力、关键道具与标志性场景同时出现），避免整体印象近似。第五，若原作仍在版权保护期或来源不明，只输出改编方案与合规提示，不逐字复现原文，不输出超过 200 字的原文摘录。第六，明确列出仍然存在的相似点与需要人工复核的合规风险。`,
+		},
+		{
+			Operation: OperationNovelSearchQuery, Label: "小说检索条件", Category: "漫画", OutputType: "json", SchemaKey: "novel-search-query/v1",
+			Description:    "把用户的一句话创意转换成检索现有小说的关键词、题材与排除条件。",
+			Variables:      []PromptTemplateVariable{},
+			DefaultContent: `你是小说检索助手。根据用户的一句话创意，输出用于在公开小说资料库中检索相似题材作品的条件。关键词要覆盖题材、核心设定、人物关系与情绪走向，但不要编造具体书名或作者；作者名和书名只有在用户明确给出时才填写。排除条件用于过滤用户不希望出现的题材或分级。`,
 		},
 	}
 }
@@ -145,6 +167,24 @@ func protectedPromptContext(operation string, values map[string]string) string {
 			"【用户想法】\n" + values["用户想法"],
 			"【受保护输出契约】\n" + promptOutputContract(operation),
 		}, "\n\n")
+	case OperationComicPanelScript:
+		return strings.Join([]string{
+			fmt.Sprintf("【任务】\n把漫画项目《%s》的章节“%s”拆成黑白漫画分格脚本。", values["项目名称"], values["章节名称"]),
+			"【项目画风】\n" + values["项目画风"],
+			"【章节正文】\n" + values["章节正文"],
+			"【受保护输出契约】\n" + promptOutputContract(operation),
+		}, "\n\n")
+	case OperationNovelAdaptation:
+		return strings.Join([]string{
+			"【改编要求】\n" + values["改编要求"],
+			"【原作素材】\n" + values["原作素材"],
+			"【受保护输出契约】\n" + promptOutputContract(operation),
+		}, "\n\n")
+	case OperationNovelSearchQuery:
+		return strings.Join([]string{
+			"【用户创意】\n" + values["用户创意"],
+			"【受保护输出契约】\n" + promptOutputContract(operation),
+		}, "\n\n")
 	default:
 		return ""
 	}
@@ -160,6 +200,12 @@ func promptOutputContract(operation string) string {
 		return "服务端固定 JSON Schema chapter-assets/v1（不可由运营模板或用户定制覆盖）：\n" + ChapterAssetsJSONSchema
 	case OperationShortDramaOutline:
 		return "服务端固定 JSON Schema short-drama-outline/v1（不可由运营模板或用户定制覆盖）：\n" + shortDramaOutlineJSONSchema + "\n只输出一个 JSON 对象，不要输出 markdown 代码块或其他文字。"
+	case OperationComicPanelScript:
+		return "服务端固定 JSON Schema comic-panel-script/v1（不可由运营模板或用户定制覆盖）：\n" + comicPanelScriptJSONSchema + "\n只输出一个 JSON 对象，不要输出 markdown 代码块或其他文字。"
+	case OperationNovelAdaptation:
+		return "服务端固定 JSON Schema novel-adaptation/v1（不可由运营模板或用户定制覆盖）：\n" + novelAdaptationJSONSchema + "\n只输出一个 JSON 对象，不要输出 markdown 代码块或其他文字。"
+	case OperationNovelSearchQuery:
+		return "服务端固定 JSON Schema novel-search-query/v1（不可由运营模板或用户定制覆盖）：\n" + novelSearchQueryJSONSchema + "\n只输出一个 JSON 对象，不要输出 markdown 代码块或其他文字。"
 	case OperationSkillDraft:
 		return "服务端固定 JSON Schema skill-draft/v1（不可由运营模板或用户定制覆盖）：\n" + skillDraftJSONSchema + "\n只输出一个 JSON 对象，不要输出 markdown 代码块或其他文字。"
 	default:
@@ -196,9 +242,111 @@ const skillDraftJSONSchema = `{
   "required": ["skillName", "tag", "description", "instruction"],
   "properties": {
     "skillName": {"type": "string"},
-    "tag": {"type": "string", "enum": ["drama", "ecommerce", "creative", "social", "others"]},
+    "tag": {"type": "string", "enum": ["drama", "comic", "ecommerce", "creative", "social", "others"]},
     "description": {"type": "string"},
     "instruction": {"type": "string"}
+  }
+}`
+
+const comicPanelScriptJSONSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "panels"],
+  "properties": {
+    "title": {"type": "string"},
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["panelNumber", "layout", "shotSize", "scene", "characters", "action", "dialogue", "imagePrompt", "negativePrompt"],
+        "properties": {
+          "panelNumber": {"type": "integer", "minimum": 1},
+          "layout": {"type": "string", "description": "画格形状与版面位置，例如整页横幅、右上三分格"},
+          "shotSize": {"type": "string"},
+          "scene": {"type": "string"},
+          "characters": {"type": "array", "items": {"type": "string"}},
+          "action": {"type": "string"},
+          "dialogue": {"type": "array", "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "speaker", "text"],
+            "properties": {
+              "kind": {"type": "string", "enum": ["speech", "thought", "narration", "sfx"]},
+              "speaker": {"type": "string"},
+              "text": {"type": "string"}
+            }
+          }},
+          "imagePrompt": {"type": "string"},
+          "negativePrompt": {"type": "string"},
+          "continuity": {"type": "string"}
+        }
+      }
+    }
+  }
+}`
+
+const novelAdaptationJSONSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "synopsis", "characters", "world", "episodes", "compliance"],
+  "properties": {
+    "title": {"type": "string"},
+    "synopsis": {"type": "string"},
+    "characters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "role", "appearance", "personality", "relationship"],
+        "properties": {
+          "name": {"type": "string"},
+          "role": {"type": "string"},
+          "appearance": {"type": "string"},
+          "personality": {"type": "string"},
+          "relationship": {"type": "string"}
+        }
+      }
+    },
+    "world": {"type": "string"},
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "summary", "content"],
+        "properties": {
+          "title": {"type": "string"},
+          "summary": {"type": "string"},
+          "content": {"type": "string"}
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["similarities", "risks", "notes"],
+      "properties": {
+        "similarities": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}`
+
+const novelSearchQueryJSONSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["keywords", "genres", "exclude", "note"],
+  "properties": {
+    "keywords": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "genres": {"type": "array", "items": {"type": "string"}},
+    "exclude": {"type": "array", "items": {"type": "string"}},
+    "note": {"type": "string"}
   }
 }`
 

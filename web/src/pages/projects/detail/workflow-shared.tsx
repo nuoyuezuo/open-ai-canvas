@@ -4,19 +4,13 @@ import { Link } from "react-router";
 
 import { StatusBadge } from "@/components/ui/base/badges";
 import { assetCategoryLabel as sharedAssetCategoryLabel } from "@/lib/asset-category";
+import { SHORT_DRAMA_WORKFLOW_PROFILE, workflowStage, type ProjectWorkflowProfile } from "@/lib/project-workflow-profile";
 import type { ProjectDetail, ProjectShot, ShotArtifact, ShotRevision, WorkflowStep } from "@/services/api/projects";
 import type { TaskStatus } from "@/services/api/task-center";
 
-export type ShortDramaWorkflowStage = "story" | "assets" | "storyboard" | "previz" | "video" | "delivery";
+export type ShortDramaWorkflowStage = string;
 
-export const workflowStages: Array<{ key: ShortDramaWorkflowStage; label: string; shortLabel: string }> = [
-    { key: "story", label: "剧情与章节", shortLabel: "剧情" },
-    { key: "assets", label: "资产拆分", shortLabel: "资产" },
-    { key: "storyboard", label: "分镜脚本", shortLabel: "分镜" },
-    { key: "previz", label: "黑白动作预演", shortLabel: "预演" },
-    { key: "video", label: "视频生成", shortLabel: "视频" },
-    { key: "delivery", label: "交付与打包", shortLabel: "交付" },
-];
+export const workflowStages = SHORT_DRAMA_WORKFLOW_PROFILE.stages;
 
 export function WorkflowStageLink({ href, active, step, index, label, shortLabel }: { href: string; active: boolean; step?: WorkflowStep; index: number; label: string; shortLabel: string }) {
     const completed = step?.status === "completed" || step?.status === "skipped";
@@ -63,10 +57,9 @@ export function currentArtifact(detail: ProjectDetail, shotId: string, type: str
     return artifacts.find((item) => item.selected) || artifacts[0];
 }
 
-export function artifactTypeForStage(stage: ShortDramaWorkflowStage) {
-    if (stage === "video") return "video";
-    if (stage === "previz") return "action_board";
-    return "storyboard";
+/** 阶段的产物槽位由工作流描述决定；漫画的成稿画面复用 storyboard 槽位。 */
+export function artifactTypeForStage(stage: ShortDramaWorkflowStage, profile: ProjectWorkflowProfile = SHORT_DRAMA_WORKFLOW_PROFILE) {
+    return workflowStage(profile, stage)?.artifact?.type || "";
 }
 
 export function assetCategoryLabel(category: string) {

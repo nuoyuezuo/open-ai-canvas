@@ -88,3 +88,29 @@ func RequireFeature(svc *service.Service, feature string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequireAnyFeature 用于多个模块共享同一组接口的场景：任一功能开放即放行，
+// 全部关闭才拒绝。登录态校验语义与 RequireFeature 保持一致。
+func RequireAnyFeature(svc *service.Service, features ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, err := currentUser(c, svc); err != nil {
+			failService(c, err)
+			c.Abort()
+			return
+		}
+		var lastErr error
+		for _, feature := range features {
+			if err := svc.RequireFeature(feature); err == nil {
+				c.Next()
+				return
+			} else {
+				lastErr = err
+			}
+		}
+		if lastErr == nil {
+			lastErr = service.Forbidden("该功能暂未开放")
+		}
+		failService(c, lastErr)
+		c.Abort()
+	}
+}

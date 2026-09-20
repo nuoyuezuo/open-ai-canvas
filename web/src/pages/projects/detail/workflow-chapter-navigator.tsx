@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import { PaginationBar } from "@/components/layout/workspace-page";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
+import { projectRoute, useProjectRouteBase } from "@/lib/project-route-base";
 import type { ProjectUnit } from "@/services/api/projects";
 
 type Props = {
@@ -12,10 +13,13 @@ type Props = {
     units: ProjectUnit[];
     unitId?: string;
     stage?: string;
+    /** 缺失 stage 时的落地阶段，短剧与漫画不同。 */
+    defaultStage?: string;
 };
 
-export function WorkflowChapterNavigator({ projectId, units, unitId, stage }: Props) {
+export function WorkflowChapterNavigator({ projectId, units, unitId, stage, defaultStage = "storyboard" }: Props) {
     const navigate = useNavigate();
+    const routeBase = useProjectRouteBase();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
@@ -46,7 +50,7 @@ export function WorkflowChapterNavigator({ projectId, units, unitId, stage }: Pr
     const goTo = (target?: ProjectUnit) => {
         if (!target) return;
         setOpen(false);
-        navigate(`/projects/${projectId}/workflow/${target.id}/${stage || "video"}`);
+        navigate(projectRoute(routeBase, projectId, "workflow", target.id, stage || defaultStage));
     };
 
     if (!current) return null;

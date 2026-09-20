@@ -391,6 +391,12 @@ func ValidatePromptTemplateResult(operation string, result map[string]interface{
 		return validateCharacterExtractResult(jsonText)
 	case OperationShortDramaOutline:
 		return validateShortDramaOutlineResult(jsonText)
+	case OperationComicPanelScript:
+		return validateComicPanelScriptResult(jsonText)
+	case OperationNovelAdaptation:
+		return validateNovelAdaptationResult(jsonText)
+	case OperationNovelSearchQuery:
+		return validateNovelSearchQueryResult(jsonText)
 	case OperationSkillDraft:
 		return validateSkillDraftResult(jsonText)
 	default:
@@ -407,6 +413,12 @@ func promptResultJSONExtractor(operation string) func(string) (string, error) {
 		return func(raw string) (string, error) { return extractPreferredJSONText(raw, "chapters") }
 	case OperationSkillDraft:
 		return func(raw string) (string, error) { return extractPreferredJSONText(raw, "skillName") }
+	case OperationComicPanelScript:
+		return func(raw string) (string, error) { return extractPreferredJSONText(raw, "panels") }
+	case OperationNovelAdaptation:
+		return func(raw string) (string, error) { return extractPreferredJSONText(raw, "episodes") }
+	case OperationNovelSearchQuery:
+		return func(raw string) (string, error) { return extractPreferredJSONText(raw, "keywords") }
 	default:
 		return extractJSONText
 	}
@@ -655,4 +667,135 @@ func uniqueStrings(values []string) []string {
 		}
 	}
 	return result
+}
+
+func validateComicPanelScriptResult(jsonText string) error {
+	var payload struct {
+		Title  string `json:"title"`
+		Panels *[]struct {
+			PanelNumber int    `json:"panelNumber"`
+			Layout      string `json:"layout"`
+			ShotSize    string `json:"shotSize"`
+			Scene       string `json:"scene"`
+			Action      string `json:"action"`
+			ImagePrompt string `json:"imagePrompt"`
+			Dialogue    *[]struct {
+				Kind string `json:"kind"`
+				Text string `json:"text"`
+			} `json:"dialogue"`
+		} `json:"panels"`
+	}
+	if err := json.Unmarshal([]byte(jsonText), &payload); err != nil {
+		return fmt.Errorf("漫画分格脚本 JSON 无法解析：%w", err)
+	}
+	if strings.TrimSpace(payload.Title) == "" {
+		return errors.New("漫画分格脚本缺少 title")
+	}
+	if payload.Panels == nil {
+		return errors.New("漫画分格脚本缺少 panels 数组")
+	}
+	if len(*payload.Panels) == 0 {
+		return errors.New("漫画分格脚本没有生成任何画格")
+	}
+	for index, panel := range *payload.Panels {
+		if panel.PanelNumber <= 0 {
+			return fmt.Errorf("漫画分格脚本第 %d 格缺少有效的 panelNumber", index+1)
+		}
+		for _, field := range []struct {
+			name  string
+			value string
+		}{
+			{name: "layout", value: panel.Layout},
+			{name: "shotSize", value: panel.ShotSize},
+			{name: "scene", value: panel.Scene},
+			{name: "action", value: panel.Action},
+			{name: "imagePrompt", value: panel.ImagePrompt},
+		} {
+			if strings.TrimSpace(field.value) == "" {
+				return fmt.Errorf("漫画分格脚本第 %d 格缺少 %s", index+1, field.name)
+			}
+		}
+		if panel.Dialogue == nil {
+			return fmt.Errorf("漫画分格脚本第 %d 格缺少 dialogue 数组", index+1)
+		}
+	}
+	return nil
+}
+
+func validateNovelAdaptationResult(jsonText string) error {
+	var payload struct {
+		Title      string `json:"title"`
+		Synopsis   string `json:"synopsis"`
+		World      string `json:"world"`
+		Characters *[]struct {
+			Name string `json:"name"`
+			Role string `json:"role"`
+		} `json:"characters"`
+		Episodes *[]struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+		} `json:"episodes"`
+		Compliance *struct {
+			Similarities *[]string `json:"similarities"`
+			Risks        *[]string `json:"risks"`
+			Notes        string    `json:"notes"`
+		} `json:"compliance"`
+	}
+	if err := json.Unmarshal([]byte(jsonText), &payload); err != nil {
+		return fmt.Errorf("小说改编 JSON 无法解析：%w", err)
+	}
+	if strings.TrimSpace(payload.Title) == "" {
+		return errors.New("小说改编缺少 title")
+	}
+	if strings.TrimSpace(payload.Synopsis) == "" {
+		return errors.New("小说改编缺少 synopsis")
+	}
+	if strings.TrimSpace(payload.World) == "" {
+		return errors.New("小说改编缺少 world")
+	}
+	if payload.Characters == nil || len(*payload.Characters) == 0 {
+		return errors.New("小说改编必须重建至少 1 个原创角色")
+	}
+	for index, character := range *payload.Characters {
+		if strings.TrimSpace(character.Name) == "" || strings.TrimSpace(character.Role) == "" {
+			return fmt.Errorf("小说改编第 %d 个角色缺少 name 或 role", index+1)
+		}
+	}
+	if payload.Episodes == nil || len(*payload.Episodes) == 0 {
+		return errors.New("小说改编没有生成任何章节")
+	}
+	for index, episode := range *payload.Episodes {
+		if strings.TrimSpace(episode.Title) == "" || strings.TrimSpace(episode.Content) == "" {
+			return fmt.Errorf("小说改编第 %d 章缺少 title 或 content", index+1)
+		}
+	}
+	// 防侵权是改编的硬约束：缺少合规字段说明模型没有执行重建要求，不能落库。
+	if payload.Compliance == nil || payload.Compliance.Similarities == nil || payload.Compliance.Risks == nil {
+		return errors.New("小说改编缺少 compliance 合规说明（similarities、risks、notes）")
+	}
+	return nil
+}
+
+func validateNovelSearchQueryResult(jsonText string) error {
+	var payload struct {
+		Keywords *[]string `json:"keywords"`
+		Genres   *[]string `json:"genres"`
+		Exclude  *[]string `json:"exclude"`
+		Note     string    `json:"note"`
+	}
+	if err := json.Unmarshal([]byte(jsonText), &payload); err != nil {
+		return fmt.Errorf("小说检索条件 JSON 无法解析：%w", err)
+	}
+	if payload.Keywords == nil || len(*payload.Keywords) == 0 {
+		return errors.New("小说检索条件缺少 keywords")
+	}
+	if payload.Genres == nil || payload.Exclude == nil {
+		return errors.New("小说检索条件必须包含 genres 和 exclude 数组")
+	}
+	for index, keyword := range *payload.Keywords {
+		if strings.TrimSpace(keyword) == "" {
+			return fmt.Errorf("小说检索条件第 %d 个关键词为空", index+1)
+		}
+	}
+	return nil
 }

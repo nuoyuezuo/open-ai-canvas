@@ -58,6 +58,37 @@ bun run dev
 
 前端默认监听 `0.0.0.0:3000`，Vite 将 `/api` 和 OAuth 回调代理到 `127.0.0.1:8080`。如需修改代理目标，可设置 `VITE_API_PROXY_TARGET`。
 
+### 用公网 IP 访问时切到 HTTPS
+
+`navigator.locks`（Web Locks）和 `crypto.randomUUID` 只在**安全上下文**可用，也就是 HTTPS，或 `http://localhost` / `http://127.0.0.1`。用「公网 IP + 明文 HTTP」打开开发服务器时两者都不存在，生成结果落库会直接失败并提示“当前浏览器不支持跨页面生成副作用互斥”。**端口号不影响安全上下文判定**，只换端口解决不了。
+
+没有域名时用自签证书即可，不需要备案或云控制台改配置：
+
+```bash
+# 1. 生成自签证书，把实际访问用的 IP 写进 SAN
+web/scripts/dev-https-cert.sh 124.222.118.32
+
+# 2. 启动时开启 HTTPS
+cd web && CANVAS_DEV_HTTPS=1 bun run dev
+```
+
+证书与私钥写入 `.local/certs/`（已被 `.gitignore` 忽略），**不要提交或复用为生产证书**。SAN 默认包含 `localhost`、`127.0.0.1` 和自动探测到的内网地址；重跑不带参数会保留上一次已签发的地址，需要重签时加 `--force`。
+
+**SAN 必须包含浏览器地址栏里那个主机名或 IP**，否则浏览器会因证书名不匹配而拒绝（`ERR_CERT_COMMON_NAME_INVALID`）。这是与 `@vitejs/plugin-basic-ssl` 的关键区别：后者只签 `localhost`，用 IP 访问仍然不通。
+
+首次访问会提示证书不受信任（`ERR_CERT_AUTHORITY_INVALID`），选择“继续访问”即可；若不想每次都提示，把 `.local/certs/dev-cert.pem` 导入系统或浏览器信任库。
+
+开关默认关闭，不设置 `CANVAS_DEV_HTTPS` 时行为与之前完全一致，仍是明文 HTTP。证书缺失时配置会直接报错而不是静默降级。相关变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `CANVAS_DEV_HTTPS` | 空（关闭） | 设为 `1` 时启用 HTTPS |
+| `CANVAS_DEV_PORT` | `3000` | 开发服务器端口，`bun run dev` 与 `bun run start` 共用 |
+| `CANVAS_DEV_HTTPS_CERT` | `.local/certs/dev-cert.pem` | 证书路径 |
+| `CANVAS_DEV_HTTPS_KEY` | `.local/certs/dev-key.pem` | 私钥路径 |
+
+开发服务器仍会暴露在公网。更稳妥的做法是 `--host 127.0.0.1` 配合 SSH 隧道（`ssh -L 5173:127.0.0.1:5173` 后访问 `http://localhost:5173`），这样既满足安全上下文又不需要信任任何证书。
+
 ## 时间线字幕转写（whisper.cpp）
 
 时间线“字幕转写”由**本地 whisper.cpp server** 执行：后端将片段音频预处理为 16k mono wav 后，POST 到 `CANVAS_WHISPER_BASE_URL/inference`（whisper server 原生接口，`response_format=verbose_json`）。未配置该地址时，转写任务会立即明确失败，提示“撰写失败未配置本地转写服务”。

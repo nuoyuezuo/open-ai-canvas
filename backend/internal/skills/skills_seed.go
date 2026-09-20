@@ -48,12 +48,25 @@ type builtinSkillDefinition struct {
 
 // EnsureBuiltinSkills 校验并同步内置技能正文；用户关系独立保存，因此重复启动不会清空加入或收藏状态。
 func (s *Service) EnsureBuiltinSkills() error {
+	skills, err := parseBuiltinSkills()
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpsertBuiltinSkills(skills); err != nil {
+		return fmt.Errorf("同步内置技能失败: %w", err)
+	}
+	return nil
+}
+
+// parseBuiltinSkills 校验内置技能种子并转换为待落库模型。
+// 与启动同步解耦，便于在不连数据库的情况下测试种子数据本身。
+func parseBuiltinSkills() ([]model.Skill, error) {
 	var definitions []builtinSkillDefinition
 	if err := json.Unmarshal(builtinSkillsJSON, &definitions); err != nil {
-		return fmt.Errorf("解析内置技能失败: %w", err)
+		return nil, fmt.Errorf("解析内置技能失败: %w", err)
 	}
 	if len(definitions) == 0 {
-		return fmt.Errorf("内置技能不能为空")
+		return nil, fmt.Errorf("内置技能不能为空")
 	}
 
 	seen := make(map[string]struct{}, len(definitions))
@@ -62,22 +75,22 @@ func (s *Service) EnsureBuiltinSkills() error {
 		id := strings.TrimSpace(definition.SkillID)
 		ownerID := strings.TrimSpace(definition.OwnerUID)
 		if id == "" || len(id) > 36 || ownerID == "" || len(ownerID) > 36 {
-			return fmt.Errorf("内置技能 ID 或作者 ID 无效: %q", definition.SkillID)
+			return nil, fmt.Errorf("内置技能 ID 或作者 ID 无效: %q", definition.SkillID)
 		}
 		if _, exists := seen[id]; exists {
-			return fmt.Errorf("内置技能 ID 重复: %s", id)
+			return nil, fmt.Errorf("内置技能 ID 重复: %s", id)
 		}
 		seen[id] = struct{}{}
 		if definition.Status != skillStatusEnabled || definition.IsPrivate {
-			return fmt.Errorf("内置技能必须为公开启用状态: %s", id)
+			return nil, fmt.Errorf("内置技能必须为公开启用状态: %s", id)
 		}
 		if definition.CreateTime <= 0 || definition.UpdateTime <= 0 || definition.LikeCount < 0 || definition.AddedCount < 0 {
-			return fmt.Errorf("内置技能时间或计数无效: %s", id)
+			return nil, fmt.Errorf("内置技能时间或计数无效: %s", id)
 		}
 		authorName := strings.TrimSpace(definition.EffectiveUser.Name)
 		authorAvatarURL := strings.TrimSpace(definition.EffectiveUser.AvatarURL)
 		if authorName == "" || (authorAvatarURL != "" && !validSkillURL(authorAvatarURL)) {
-			return fmt.Errorf("内置技能作者信息无效: %s", id)
+			return nil, fmt.Errorf("内置技能作者信息无效: %s", id)
 		}
 		media := make([]SkillShowcaseMedia, 0, len(definition.ShowcaseMedia))
 		for _, item := range definition.ShowcaseMedia {
@@ -89,7 +102,7 @@ func (s *Service) EnsureBuiltinSkills() error {
 			ShowcaseMedia: media, ExtraInfo: definition.ExtraInfo,
 		}, true)
 		if err != nil {
-			return fmt.Errorf("内置技能 %s 数据无效: %w", id, err)
+			return nil, fmt.Errorf("内置技能 %s 数据无效: %w", id, err)
 		}
 		skills = append(skills, model.Skill{
 			ID: id, OwnerID: ownerID, AuthorName: authorName, AuthorAvatarURL: authorAvatarURL,
@@ -100,8 +113,5 @@ func (s *Service) EnsureBuiltinSkills() error {
 			CreatedAt: time.UnixMilli(definition.CreateTime), UpdatedAt: time.UnixMilli(definition.UpdateTime),
 		})
 	}
-	if err := s.repo.UpsertBuiltinSkills(skills); err != nil {
-		return fmt.Errorf("同步内置技能失败: %w", err)
-	}
-	return nil
+	return skills, nil
 }

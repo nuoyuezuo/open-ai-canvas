@@ -2,7 +2,7 @@ import { CollectionToolbar } from "@/components/layout/collection-toolbar";
 import { App, Button, Dropdown, Input, Select } from "antd";
 import { Tooltip } from "@/components/ui/base/tooltip";
 
-import { Boxes, Check, Clapperboard, Heart, Library, LoaderCircle, Megaphone, MoreHorizontal, Palette, Plus, Puzzle, Search, ShoppingBag, Sparkles, UserRound } from "lucide-react";
+import { BookImage, Boxes, Check, Clapperboard, Heart, Library, LoaderCircle, Megaphone, MoreHorizontal, Palette, Plus, Puzzle, Search, ShoppingBag, Sparkles, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
@@ -25,6 +25,7 @@ const scopeOptions = [
 /* 分类图标映射：画廊卡片顶部的图标块，未知分类回退 Boxes。 */
 const categoryIcons: Record<string, LucideIcon> = {
     drama: Clapperboard,
+    comic: BookImage,
     ecommerce: ShoppingBag,
     creative: Palette,
     social: Megaphone,

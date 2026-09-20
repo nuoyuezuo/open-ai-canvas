@@ -6,7 +6,7 @@ import {
     type SkillPackageFile,
 } from "@/services/api/skills";
 
-export type SkillRuntimeProfile = "canvas" | "creation" | "shortDrama" | "director";
+export type SkillRuntimeProfile = "canvas" | "creation" | "shortDrama" | "comic" | "director";
 export type SkillRuntimeDelivery = "linked-context";
 
 type SkillRuntimeProfileConfig = {
@@ -20,6 +20,7 @@ export const SKILL_RUNTIME_PROFILES: Record<SkillRuntimeProfile, SkillRuntimePro
     canvas: { delivery: "linked-context", maxSkills: 4, maxContextChars: 32_000, maxLinkedFilesPerSkill: 3 },
     creation: { delivery: "linked-context", maxSkills: 4, maxContextChars: 32_000, maxLinkedFilesPerSkill: 3 },
     shortDrama: { delivery: "linked-context", maxSkills: 4, maxContextChars: 32_000, maxLinkedFilesPerSkill: 3 },
+    comic: { delivery: "linked-context", maxSkills: 4, maxContextChars: 32_000, maxLinkedFilesPerSkill: 3 },
     director: { delivery: "linked-context", maxSkills: 4, maxContextChars: 32_000, maxLinkedFilesPerSkill: 3 },
 };
 
@@ -59,6 +60,7 @@ type SkillRuntimeResultByProfile = {
     canvas: LinkedSkillRuntimeResult;
     creation: LinkedSkillRuntimeResult;
     shortDrama: LinkedSkillRuntimeResult;
+    comic: LinkedSkillRuntimeResult;
     director: LinkedSkillRuntimeResult;
 };
 

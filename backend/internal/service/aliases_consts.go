@@ -40,6 +40,8 @@ const (
 	FeatureFrontendModels              = app.FeatureFrontendModels
 	FeaturePluginCenter                = app.FeaturePluginCenter
 	FeatureShortDrama                  = app.FeatureShortDrama
+	FeatureComic                       = app.FeatureComic
+	FeatureComicDrama                  = app.FeatureComicDrama
 	FeatureSystemPlugins               = app.FeatureSystemPlugins
 	FeatureTaskCenter                  = app.FeatureTaskCenter
 	FeatureTimelineTranscription       = app.FeatureTimelineTranscription

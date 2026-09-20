@@ -28,7 +28,6 @@
 
 完整功能以[功能清单](docs/content/docs/overview/features.mdx)为准。
 
-## 快速开始
 
 ### 环境要求
 

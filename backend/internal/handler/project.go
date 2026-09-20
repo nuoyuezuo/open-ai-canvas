@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"infinite-canvas/backend/internal/service"
 
@@ -12,6 +13,10 @@ import (
 
 func RegisterProjectRoutes(r *gin.RouterGroup, svc *service.Service) {
 	RegisterStyleProfileRoutes(r, svc)
+	// 项目级接口按 :id 对应项目的真实类型判断模块开放状态，避免关闭漫画后
+	// 仍能通过短剧入口的项目 ID 继续读写漫画生产数据。Gin 在进入中间件前
+	// 已完成路由匹配，因此这里可以安全读取 :id。
+	r.Use(requireProjectFeatureMiddleware(svc))
 	r.GET("/voice-profiles", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
 		if err != nil {
@@ -31,10 +36,15 @@ func RegisterProjectRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
+		projectType := c.Query("type")
+		if err := svc.RequireProjectTypeFeature(projectType); err != nil {
+			failService(c, err)
+			return
+		}
 		pageParam, hasPage := c.GetQuery("page")
 		pageSizeParam, hasPageSize := c.GetQuery("pageSize")
 		if !hasPage && !hasPageSize {
-			projects, err := svc.ListProjects(user.ID)
+			projects, err := svc.ListProjects(user.ID, projectType)
 			if err != nil {
 				failService(c, err)
 				return
@@ -52,7 +62,7 @@ func RegisterProjectRoutes(r *gin.RouterGroup, svc *service.Service) {
 			fail(c, http.StatusBadRequest, err)
 			return
 		}
-		projects, err := svc.ListProjectsPage(user.ID, page, pageSize)
+		projects, err := svc.ListProjectsPage(user.ID, projectType, page, pageSize)
 		if err != nil {
 			failService(c, err)
 			return
@@ -69,6 +79,10 @@ func RegisterProjectRoutes(r *gin.RouterGroup, svc *service.Service) {
 		var req service.CreateProjectRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		if err := svc.RequireProjectTypeFeature(req.Type); err != nil {
+			failService(c, err)
 			return
 		}
 		project, err := svc.CreateProject(user.ID, req)
@@ -932,4 +946,28 @@ func parsePaginationQuery(c *gin.Context, fallbackPageSize int) (int, int, error
 		return 0, 0, fmt.Errorf("pageSize: %w", err)
 	}
 	return page, pageSize, nil
+}
+
+// requireProjectFeatureMiddleware 只对带项目 ID 的路径生效；列表与创建接口
+// 已经按请求参数或默认入口单独校验，不在这里重复判断。
+func requireProjectFeatureMiddleware(svc *service.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		projectID := strings.TrimSpace(c.Param("id"))
+		if projectID == "" {
+			c.Next()
+			return
+		}
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			c.Abort()
+			return
+		}
+		if err := svc.RequireProjectFeatureForUser(user.ID, projectID); err != nil {
+			failService(c, err)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }

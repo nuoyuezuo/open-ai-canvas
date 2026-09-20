@@ -211,6 +211,13 @@ type (
 	ProjectWorkflowDetail                  = app.ProjectWorkflowDetail
 	PromptOperationDefinition              = app.PromptOperationDefinition
 	PromptTemplateRequest                  = app.PromptTemplateRequest
+	NovelSearchRequest                     = app.NovelSearchRequest
+	NovelSearchResult                      = app.NovelSearchResult
+	NovelSourceKind                        = app.NovelSourceKind
+	NovelAdaptationSource                  = app.NovelAdaptationSource
+	NovelAdaptationGuard                   = app.NovelAdaptationGuard
+	NovelLibrarySettingRequest             = app.NovelLibrarySettingRequest
+	PublicNovelLibrarySetting              = app.PublicNovelLibrarySetting
 	PromptTemplateVariable                 = app.PromptTemplateVariable
 	ProviderTaskQueryResult                = app.ProviderTaskQueryResult
 	PublicAppearanceSetting                = app.PublicAppearanceSetting

@@ -2,6 +2,7 @@ import type { Skill, SkillCategory } from "@/services/api/skills";
 
 export const fallbackSkillCategories: SkillCategory[] = [
     { value: "drama", label: "短剧影视" },
+    { value: "comic", label: "漫画漫剧" },
     { value: "ecommerce", label: "电商营销" },
     { value: "creative", label: "创意设计" },
     { value: "social", label: "社媒内容" },

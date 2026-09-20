@@ -80,6 +80,25 @@ Skills 的 `tool_completed` / `tool_failed` 事件附带 `skillId`、`skillName`
 
 `POST /api/admin/channels/:id/duplicate` 需要管理员权限，会复制指定系统渠道的连接配置、加密凭证、请求头、模型和价格档，生成新的渠道与模型 ID；复制渠道名称自动追加“ - 副本”。原渠道及其前台供应线路不受影响。
 
+## 漫画小说检索与资料库
+
+漫画的小说检索与改编走独立接口，都要求登录。检索是强校验写路径的前置步骤，只返回摘要级候选，不返回全文。
+
+- `POST /novels/search`：请求体 `{ query?, keywords?, genres?, exclude?, limit? }`，`limit` 默认 10、上限 30，请求体上限 64KB。响应 `data` 为 `{ results, libraryConfigured }`。`libraryConfigured: false` 表示部署者未配置外部资料库，此时 `results` 为空是正常状态，前端应提示用户改用自备文本，而不是当成错误。
+- 检索结果字段：`id`、`title`、`author`、`source`（当前只产出 `external-library`）、`sourceLabel`、`sourceUrl?`、`genres`、`summary`、`excerpt?`、`wordCount`、`copyrightStatus`（`public-domain` / `creative-commons` / `licensed` / `in-copyright` / `unknown`）、`licenseNote?`。`summary` 与 `excerpt` 分别截断到 1000 / 1200 字符；`sourceUrl` 只保留 http/https 且不含认证信息的链接，其余置空。
+- `GET /admin/settings/novel-library`、`PATCH /admin/settings/novel-library`：管理员配置外部资料库。响应 `data.setting` 为 `{ enabled, endpoint, label, licenseNote, headers, hasApiKey, updatedBy?, createdAt?, updatedAt? }`。访问密钥加密存储，接口只回传 `hasApiKey`；`PATCH` 时 `apiKey` 留空表示保留原密钥。
+- 启用外部资料库时必须填写 `endpoint`，且必须通过出站 SSRF 校验：默认拒绝本机、私网和链路本地地址，只允许公网地址；自定义请求头最多 16 项，名称与取值都受白名单约束。未启用时不发出任何出站请求。
+
+防侵权约束落在模型输出契约上，而不是提示词建议：`novel-adaptation/v1` 把 `compliance.similarities`、`compliance.risks` 和 `compliance.notes` 列为必需字段，缺失时后端与前端都会拒绝结果，不提供兜底默认值。检索来源进入改编前必须由用户显式确认授权，且只携带摘要与短摘录，完整正文只能由用户自备。
+
+## 项目生产工作流
+
+短剧、漫画与漫剧共用 `/api/projects` 下的项目、章节、镜头/画格与产物接口，入口按 `type` 查询参数区分：`short-drama`、`comic`、`comic-drama`。项目级接口按路径中项目的真实类型校验模块开关，避免关闭漫画后仍能通过短剧入口的项目 ID 读写漫画数据。
+
+- 内置工作流模板按项目类型选择：短剧是 `short-drama-production` v2（`story` / `assets` / `storyboard` / `previz` / `video` / `delivery`），漫画与漫剧是 `comic-production` v1（`story` / `assets` / `panels` / `inking` / `delivery`）。
+- 产物槽位：短剧分镜写入 `storyboard`、预演写入 `action_board`、成片写入 `video`；漫画分格脚本与成稿画面都写入 `storyboard`，交付复用 `video` 槽位承载整章导出结果。
+- 阶段完成门禁按项目类型判定：漫画的 `delivery` 要求每格存在已确认的成稿画面，而不是逐格视频。
+
 ## 信封
 
 成功：

@@ -58,3 +58,43 @@ func TestParseShowcaseMediaAcceptsStoredSnakeCase(t *testing.T) {
 		t.Fatalf("unexpected camelCase parse: %+v", items)
 	}
 }
+
+func TestBuiltinSkillsSeedIsValidAndCoversComic(t *testing.T) {
+	skills, err := parseBuiltinSkills()
+	if err != nil {
+		t.Fatalf("内置技能种子校验失败: %v", err)
+	}
+	if len(skills) == 0 {
+		t.Fatal("内置技能不能为空")
+	}
+	comic := 0
+	for _, skill := range skills {
+		if skill.Tag == "comic" {
+			comic++
+			if skill.Name == "" || skill.Description == "" || skill.Instruction == "" {
+				t.Fatalf("漫画技能缺少正文: %s", skill.Name)
+			}
+		}
+	}
+	if comic == 0 {
+		t.Fatal("内置技能缺少 comic 分类的默认漫画技能")
+	}
+}
+
+func TestSkillCategoriesIncludeComic(t *testing.T) {
+	found := false
+	for _, category := range skillCategories() {
+		if category.Value == "comic" {
+			found = true
+			if category.Label == "" {
+				t.Fatal("comic 分类缺少展示名称")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("技能分类缺少 comic")
+	}
+	if _, ok := skillCategoryLabels["comic"]; !ok {
+		t.Fatal("skillCategoryLabels 缺少 comic，技能创建与草稿会被拒绝")
+	}
+}

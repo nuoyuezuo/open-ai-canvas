@@ -124,9 +124,11 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 | `creation_runs` | 保存创作 Agent 的服务端权威状态、执行租约、已批准提案和画布快照 | `(user_id, client_key)` 唯一；客户端会话只作为输入，修订号、执行 epoch 和租约由 service 强校验，不能据前端状态跳过审批或重复执行 |
 | `creation_submissions` | 保存创作提案中每个生成项的请求、报价签名、审批和任务绑定 | `(run_id, item_key)` 与 `task_id` 分别唯一；相同提交只允许创建一个任务，过期、撤销或提案哈希不一致时拒绝执行 |
 | `tasks.creation_submission_id` | 将生成任务反向绑定到已批准的创作提交 | 字段可空以兼容普通任务和旧数据；非空值唯一，阻止同一提交产生多个任务 |
-| `workflow_template_versions` / `workflow_instances` / `workflow_step_instances` | 保存短剧生产模板和项目、章节实例 | 短剧分镜工作流 v2 顺序为剧情、资产、分镜、动作预演、视频、交付 |
+| `workflow_template_versions` / `workflow_instances` / `workflow_step_instances` | 保存短剧与漫画生产模板和项目、章节实例 | 短剧分镜工作流 v2 顺序为剧情、资产、分镜、动作预演、视频、交付；漫画与漫剧使用 `comic-production` v1，顺序为原著、资产、分格脚本、成稿画面、交付 |
 
-短剧项目状态以这些领域表为准。自由画布可以承载探索节点，但画布 metadata 不作为生产完成度、镜头版本或交付可用性的真相源。
+短剧与漫画共用同一组领域表：`project_units` 在短剧里是章节、在漫画里是原著章节，`shots` 是镜头或画格，`shot_artifacts` 是分镜图/视频或画格成稿。项目类型由 `projects.type` 区分（`short-drama` / `comic` / `comic-drama`），模块开关按真实类型校验。项目状态以这些领域表为准。自由画布可以承载探索节点，但画布 metadata 不作为生产完成度、镜头版本或交付可用性的真相源。
+
+漫画的小说资料库配置复用既有 `system_settings` 表，键 `novel_library`，不新增结构迁移。JSON 值保存外部资料库的启用状态、接口地址、来源标签、授权说明、自定义请求头和加密后的访问密钥；公开投影只输出 `hasApiKey`，不回传密钥明文。未配置或未启用时不产生任何出站请求。
 
 ### 长篇项目读取边界
 

@@ -577,3 +577,105 @@ func TestRegisterTaskOutputAcceptsLinkedCanvasAndCreatesShotArtifact(t *testing.
 		t.Fatalf("unexpected shot artifact: %+v", storedArtifact)
 	}
 }
+
+func seedComicProject(t *testing.T, db *gorm.DB) (model.Project, model.ProjectUnit) {
+	t.Helper()
+	now := time.Now()
+	project := model.Project{ID: "project-comic", UserID: "user-1", Name: "漫画", Type: string(model.ProjectTypeComic), Status: model.ProjectStatusActive, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	unit := model.ProjectUnit{ID: "unit-comic", ProjectID: project.ID, Kind: model.ProjectUnitKindChapter, Title: "第一章", SourceText: "信使跃过积水。", Status: model.ProjectUnitStatusDraft, CreatedAt: now, UpdatedAt: now}
+	if err := db.Create(&project).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&unit).Error; err != nil {
+		t.Fatal(err)
+	}
+	return project, unit
+}
+
+func TestComicWorkflowUsesPanelProductionOrder(t *testing.T) {
+	service, db := newProjectWorkflowV2TestService(t)
+	project, unit := seedComicProject(t, db)
+	if err := service.EnsureBuiltinProjectWorkflowTemplate(); err != nil {
+		t.Fatal(err)
+	}
+	workflow, err := service.CreateUnitWorkflow("user-1", project.ID, unit.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := make([]string, 0, len(workflow.Steps))
+	for _, step := range workflow.Steps {
+		keys = append(keys, step.StepKey)
+	}
+	want := []string{"story", "assets", "panels", "inking", "delivery"}
+	if !reflect.DeepEqual(keys, want) {
+		t.Fatalf("comic step keys = %v, want %v", keys, want)
+	}
+	// 漫画工作流必须使用独立的模板版本，不能复用短剧阶段定义。
+	comicTemplate, err := service.repo.WorkflowTemplateVersion(builtinComicWorkflowKey, builtinComicWorkflowVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workflow.Instance.TemplateVersionID != comicTemplate.ID {
+		t.Fatalf("comic workflow template = %s, want %s", workflow.Instance.TemplateVersionID, comicTemplate.ID)
+	}
+}
+
+func TestComicPanelStageRequiresScriptVersion(t *testing.T) {
+	service, db := newProjectWorkflowV2TestService(t)
+	project, unit := seedComicProject(t, db)
+	if err := service.EnsureBuiltinProjectWorkflowTemplate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CreateUnitWorkflow("user-1", project.ID, unit.ID); err != nil {
+		t.Fatal(err)
+	}
+	// 依次完成前置阶段，让 panels 进入可完成状态。
+	for _, stepKey := range []string{"story", "assets"} {
+		// 每次状态流转都会推进下一步，必须重新读取步骤而不是复用初始快照。
+		current, err := service.ProjectWorkflows(project.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		step := workflowStepByKey(t, current[0], stepKey)
+		// ready → completed 不是合法流转，必须先进入 running。
+		if _, err := service.UpdateWorkflowStep("user-1", project.ID, step.ID, UpdateWorkflowStepRequest{Status: string(model.WorkflowStepStatusRunning)}); err != nil {
+			t.Fatalf("start %s step: %v", stepKey, err)
+		}
+		if _, err := service.UpdateWorkflowStep("user-1", project.ID, step.ID, UpdateWorkflowStepRequest{Status: string(model.WorkflowStepStatusCompleted)}); err != nil {
+			t.Fatalf("complete %s step: %v", stepKey, err)
+		}
+	}
+	current, err := service.ProjectWorkflows(project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	panelsStep := workflowStepByKey(t, current[0], "panels")
+	if _, err := service.UpdateWorkflowStep("user-1", project.ID, panelsStep.ID, UpdateWorkflowStepRequest{Status: string(model.WorkflowStepStatusRunning)}); err != nil {
+		t.Fatalf("start panels step: %v", err)
+	}
+	// 还没有画格时不能完成分格脚本阶段。
+	if _, err := service.UpdateWorkflowStep("user-1", project.ID, panelsStep.ID, UpdateWorkflowStepRequest{Status: string(model.WorkflowStepStatusCompleted)}); err == nil {
+		t.Fatal("UpdateWorkflowStep() error = nil, want gate on missing panels")
+	}
+	shot, err := service.CreateProjectShot("user-1", project.ID, CreateProjectShotRequest{UnitID: unit.ID, Title: "P.01", Description: "信使跃过积水"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shot.CurrentRevisionID == "" {
+		t.Fatal("created panel has no script revision")
+	}
+	if _, err := service.UpdateWorkflowStep("user-1", project.ID, panelsStep.ID, UpdateWorkflowStepRequest{Status: string(model.WorkflowStepStatusCompleted)}); err != nil {
+		t.Fatalf("UpdateWorkflowStep() error = %v, want panels stage completable", err)
+	}
+}
+
+func workflowStepByKey(t *testing.T, workflow ProjectWorkflowDetail, stepKey string) model.WorkflowStepInstance {
+	t.Helper()
+	for _, step := range workflow.Steps {
+		if step.StepKey == stepKey {
+			return step
+		}
+	}
+	t.Fatalf("workflow step %s not found", stepKey)
+	return model.WorkflowStepInstance{}
+}
